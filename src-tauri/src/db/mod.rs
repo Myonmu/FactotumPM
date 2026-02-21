@@ -1,5 +1,6 @@
 ﻿pub mod migration;
 pub mod proxy;
+
 use std::{path::PathBuf, str::FromStr};
 
 use sqlx::{
@@ -21,6 +22,13 @@ impl Database {
     pub const DEFAULT_DB_NAME: &'static str = "FactotumPM.db";
 
     pub async fn new(password: &str, db_dir: PathBuf) -> Result<Self, String> {
+        // Ensure the directory exists
+        if !db_dir.exists() {
+            std::fs::create_dir_all(&db_dir).map_err(|e| format!("Failed to create db directory: {}", e))?;
+        }
+
+        println!("{}", password);
+
         let db_url = db_dir.join(Self::DEFAULT_DB_NAME);
 
         let connect_options =
@@ -40,6 +48,12 @@ impl Database {
         Migration::setup_migration_table(&pool)
             .await
             .map_err(|err| err.to_string())?;
+
+        let result = sqlx::query_as::<_, (String,)>("PRAGMA cipher_version;")
+            .fetch_one(&pool)
+            .await;
+
+        println!("{:?}", result);
 
         Ok(Self {
             pool: pool,

@@ -29,11 +29,7 @@ impl Migration {
 
         for file in migration_files {
             let file_name = file.clone();
-            let sql = fs::read_to_string(format!(
-                "{}/{}",
-                self.migrations_dir.to_string_lossy().to_string(),
-                file
-            ))
+            let sql = fs::read_to_string(self.migrations_dir.join(&file))
                 .map_err(|e| format!("Failed to read migration {}: {}", file, e))?;
 
             if self.is_migration_applied(&file_name).await? {
@@ -107,10 +103,10 @@ impl Migration {
             "SELECT id FROM {} WHERE name = ? LIMIT 1;",
             Migration::MIGRATION_TABLE_NAME
         ))
-            .bind(name)
-            .fetch_optional(&self.pool)
-            .await
-            .map_err(|e| e.to_string())?;
+        .bind(name)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| e.to_string())?;
 
         Ok(res.is_some())
     }
@@ -133,10 +129,10 @@ impl Migration {
             "INSERT INTO {} (name) VALUES (?)",
             Self::MIGRATION_TABLE_NAME
         ))
-            .bind(name)
-            .execute(&mut *tx)
-            .await
-            .map_err(|e| e.to_string())?;
+        .bind(name)
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| e.to_string())?;
 
         tx.commit().await.map_err(|e| e.to_string())?;
 

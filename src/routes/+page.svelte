@@ -1,156 +1,242 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
+  import { goto } from "$app/navigation";
 
-  let name = $state("");
-  let greetMsg = $state("");
+  let password = $state("");
+  let confirmPassword = $state("");
+  let message = $state("");
+  let isError = $state(false);
+  let actionType = $state<"init" | "auth">("init");
+  let isLoading = $state(false);
 
-  async function greet(event: Event) {
+  // Runs once on component mount
+  $effect(() => {
+    (async () => {
+      try {
+        const dbExists = await invoke<boolean>("does_db_exist");
+        actionType = dbExists ? "auth" : "init";
+      } catch (err) {
+        isError = true;
+        message = `Failed to check database status: ${err}`;
+      }
+    })();
+  });
+
+  async function handleInitialize(event: SubmitEvent) {
     event.preventDefault();
-    // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-    greetMsg = await invoke("greet", { name });
+
+    if (!password || password.length < 4) {
+      isError = true;
+      message = "Password must be at least 4 characters.";
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      isError = true;
+      message = "Passwords do not match.";
+      return;
+    }
+
+    try {
+      isLoading = true;
+
+      await invoke("init_db", { encryptionKey: password });
+
+      const isReady = await invoke<boolean>("is_db_ready");
+
+      if (!isReady) {
+        throw new Error("Database failed to initialize.");
+      }
+
+      isError = false;
+      message = "Database initialized successfully.";
+      goto("/app");
+
+    } catch (err) {
+      isError = true;
+      message = `Initialization error: ${String(err)}`;
+    } finally {
+      isLoading = false;
+    }
+  }
+
+  async function handleAuthenticate(event: SubmitEvent) {
+    event.preventDefault();
+
+    if (!password) {
+      isError = true;
+      message = "Please enter your password.";
+      return;
+    }
+
+    try {
+      isLoading = true;
+
+      // This command should attempt to open DB with provided key
+      // await invoke("unlock_db", { encryptionKey: password });
+      await invoke("init_db", { encryptionKey: password });
+      const isReady = await invoke<boolean>("is_db_ready");
+
+      if (!isReady) {
+        throw new Error("Invalid password.");
+      }
+
+      isError = false;
+      message = "Authentication successful.";
+      await goto("/app");
+
+    } catch (err) {
+      isError = true;
+      message = "Invalid password.";
+    } finally {
+      isLoading = false;
+    }
+  }
+
+  async function handleResetDatabase(event: MouseEvent) {
+    event.preventDefault();
+
+    if (!confirm("Are you sure? This will delete all data.")) return;
+
+    try {
+      await invoke("reset_db", { purgeData: true });
+      isError = false;
+      message = "Database reset. Please initialize again.";
+      actionType = "init";
+      password = "";
+      confirmPassword = "";
+    } catch (err) {
+      isError = true;
+      message = `Failed to reset database: ${err}`;
+    }
   }
 </script>
 
-<main class="container">
-  <h1>Welcome to Tauri + Svelte</h1>
+<main class="min-h-screen flex items-center justify-center p-4">
+  <div class="card w-full max-w-md shadow-xl bg-base-100">
+    <div class="card-body">
+      <h2 class="text-2xl font-bold text-center">
+        {actionType === "init"
+                ? "Let's Start Fresh"
+                : "Welcome Back"}
+      </h2>
 
-  <div class="row">
-    <a href="https://vite.dev" target="_blank">
-      <img src="/vite.svg" class="logo vite" alt="Vite Logo" />
-    </a>
-    <a href="https://tauri.app" target="_blank">
-      <img src="/tauri.svg" class="logo tauri" alt="Tauri Logo" />
-    </a>
-    <a href="https://svelte.dev" target="_blank">
-      <img src="/svelte.svg" class="logo svelte-kit" alt="SvelteKit Logo" />
-    </a>
+      {#if message}
+        <div
+                class="alert"
+                class:alert-error={isError}
+                class:alert-success={!isError}
+        >
+          <span>{message}</span>
+        </div>
+      {/if}
+
+      <form
+              class="space-y-4"
+              onsubmit={actionType === "init"
+          ? handleInitialize
+          : handleAuthenticate}
+      >
+
+        {#if actionType === "init"}
+          <div class="form-control">
+            <label class="label">Create Password</label>
+            <input
+                    type="password"
+                    value={password}
+                    oninput={(e) => password = (e.currentTarget as HTMLInputElement).value}
+                    class="input input-bordered w-full"
+                    placeholder="Enter a strong password"
+            />
+          </div>
+
+          <div class="form-control">
+            <label class="label">Confirm Password</label>
+            <input
+                    type="password"
+                    value={confirmPassword}
+                    oninput={(e) =>
+                confirmPassword = (e.currentTarget as HTMLInputElement).value
+              }
+                    class="input input-bordered w-full"
+                    placeholder="Re-enter your password"
+            />
+          </div>
+        {:else}
+          <div class="form-control">
+            <label class="label">Database Password</label>
+            <input
+                    type="password"
+                    value={password}
+                    oninput={(e) =>
+                password = (e.currentTarget as HTMLInputElement).value
+              }
+                    class="input input-bordered w-full"
+                    placeholder="Enter your encryption password"
+            />
+          </div>
+        {/if}
+
+        <div class="form-control mt-6">
+          <button
+                  type="submit"
+                  class="btn btn-primary w-full"
+                  disabled={isLoading}
+          >
+            {#if isLoading}
+              <span class="loading loading-spinner"></span>
+            {/if}
+            {actionType === "init"
+                    ? "Initialize Database"
+                    : "Connect"}
+          </button>
+        </div>
+
+        {#if actionType === "auth"}
+          <div class="form-control mt-4 text-center">
+            <button
+                    type="button"
+                    onclick={handleResetDatabase}
+                    class="link link-error text-sm"
+            >
+              Forgot password? Reset database.
+            </button>
+          </div>
+        {/if}
+      </form>
+
+      <div class="text-center mt-4">
+        {#if actionType === "auth"}
+          <p class="text-sm">
+            No database yet?
+            <button
+                    type="button"
+                    class="link link-primary"
+                    onclick={() => {
+                message = "";
+                actionType = "init";
+              }}
+            >
+              Initialize new database
+            </button>
+          </p>
+        {:else}
+          <p class="text-sm">
+            Already have a database?
+            <button
+                    type="button"
+                    class="link link-primary"
+                    onclick={() => {
+                message = "";
+                actionType = "auth";
+              }}
+            >
+              Connect to existing database
+            </button>
+          </p>
+        {/if}
+      </div>
+
+    </div>
   </div>
-  <p>Click on the Tauri, Vite, and SvelteKit logos to learn more.</p>
-
-  <form class="row" onsubmit={greet}>
-    <input id="greet-input" placeholder="Enter a name..." bind:value={name} />
-    <button type="submit">Greet</button>
-  </form>
-  <p>{greetMsg}</p>
 </main>
-
-<style>
-.logo.vite:hover {
-  filter: drop-shadow(0 0 2em #747bff);
-}
-
-.logo.svelte-kit:hover {
-  filter: drop-shadow(0 0 2em #ff3e00);
-}
-
-:root {
-  font-family: Inter, Avenir, Helvetica, Arial, sans-serif;
-  font-size: 16px;
-  line-height: 24px;
-  font-weight: 400;
-
-  color: #0f0f0f;
-  background-color: #f6f6f6;
-
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  -webkit-text-size-adjust: 100%;
-}
-
-.container {
-  margin: 0;
-  padding-top: 10vh;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  text-align: center;
-}
-
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: 0.75s;
-}
-
-.logo.tauri:hover {
-  filter: drop-shadow(0 0 2em #24c8db);
-}
-
-.row {
-  display: flex;
-  justify-content: center;
-}
-
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
-}
-
-a:hover {
-  color: #535bf2;
-}
-
-h1 {
-  text-align: center;
-}
-
-input,
-button {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
-  font-weight: 500;
-  font-family: inherit;
-  color: #0f0f0f;
-  background-color: #ffffff;
-  transition: border-color 0.25s;
-  box-shadow: 0 2px 2px rgba(0, 0, 0, 0.2);
-}
-
-button {
-  cursor: pointer;
-}
-
-button:hover {
-  border-color: #396cd8;
-}
-button:active {
-  border-color: #396cd8;
-  background-color: #e8e8e8;
-}
-
-input,
-button {
-  outline: none;
-}
-
-#greet-input {
-  margin-right: 5px;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    color: #f6f6f6;
-    background-color: #2f2f2f;
-  }
-
-  a:hover {
-    color: #24c8db;
-  }
-
-  input,
-  button {
-    color: #ffffff;
-    background-color: #0f0f0f98;
-  }
-  button:active {
-    background-color: #0f0f0f69;
-  }
-}
-
-</style>

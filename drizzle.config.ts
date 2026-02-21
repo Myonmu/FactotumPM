@@ -3,7 +3,7 @@
 export default defineConfig({
     dialect: 'sqlite',
     schema: './src/db/schema',
-    out: './tauri/migrations',
+    out: './src-tauri/migrations',
     verbose: false,
     strict: true,
     casing: 'snake_case',

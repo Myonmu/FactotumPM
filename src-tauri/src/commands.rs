@@ -5,7 +5,11 @@
 
 #[tauri::command]
 pub async fn does_db_exist(app_state: tauri::State<'_, AppState>) -> Result<bool, String> {
-    Ok(app_state.db_dir.join(Database::DEFAULT_DB_NAME).exists())
+    // Ensure the database directory exists first
+    let db_path = app_state.db_dir.join(Database::DEFAULT_DB_NAME);
+
+    // Check if the file exists
+    Ok(db_path.exists())
 }
 
 #[tauri::command]
@@ -23,6 +27,11 @@ pub async fn init_db(
     app_state: tauri::State<'_, AppState>,
     encryption_key: &str,
 ) -> Result<(), String> {
+    // First, ensure the database directory exists
+    if !app_state.db_dir.exists() {
+        std::fs::create_dir_all(&app_state.db_dir).map_err(|e| format!("Failed to create db directory: {}", e))?;
+    }
+
     {
         let db_lock = app_state.db.read().await;
         if db_lock.is_some() {
