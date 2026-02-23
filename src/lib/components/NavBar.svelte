@@ -4,6 +4,8 @@
     import {PanelLeftOpen, PanelLeftClose} from "lucide-svelte";
     import {isAuthSuccess} from "$lib/auth.svelte";
 
+    let {onToggleSidebar, sideBarFolded} = $props();
+
     const themes = [
         'light',
         'dark',
@@ -37,16 +39,10 @@
         'dim',
         'nord',
         'sunset',
-        'caramellatte',
     ]
 
     let currentTheme = $state("synthwave");
-    let leftPanelOpened = $state(false);
     const themePrefKey = "theme";
-
-    function toggleLeftPanel() {
-        leftPanelOpened = !leftPanelOpened;
-    }
 
     function applyTheme(theme: string) {
         document.documentElement.setAttribute("data-theme", theme);
@@ -67,19 +63,27 @@
     }
 </script>
 
+<style> .AppName {
+    font-family: ArcaneNine, sans-serif;
+}
+</style>
+
 <nav class="navbar bg-base-100 sticky top-0 z-50">
     <div class="flex-1">
         {#if isAuthSuccess()}
-            <button class="btn btn-sm" onclick={toggleLeftPanel}>
-                {#if leftPanelOpened}
-                    <PanelLeftClose class="w-5 h-5"/>
+            <button class="btn btn-sm btn-ghost" onclick={onToggleSidebar}>
+                {#if sideBarFolded}
+                    <PanelLeftOpen class="w-6 h-6"/>
                 {:else}
-                    <PanelLeftOpen class="w-5 h-5"/>
+                    <PanelLeftClose class="w-6 h-6"/>
                 {/if}
             </button>
         {/if}
     </div>
 
+    <div class="absolute left-1/2 transform -translate-x-1/2">
+        <p class="font-extrabold text-xl AppName"> FACTOTUM</p>
+    </div>
     <!-- RIGHT SIDE -->
     <div class="flex-none">
         <div class="dropdown dropdown-end">

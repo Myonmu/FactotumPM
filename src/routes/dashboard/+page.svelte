@@ -25,7 +25,7 @@
     });
 </script>
 
-<div class="min-h-screen bg-base-200">
+<div class="h-full bg-base-200">
 
     <div class="p-6 max-w-7xl mx-auto">
         <h1 class="text-3xl font-bold mb-6">Dashboard</h1>

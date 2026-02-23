@@ -7,6 +7,7 @@
     let confirmPassword = $state("");
     let isError = $state(false);
     let message = $state("");
+    let {landingPage} = $props();
 
     import {authenticateDb, doesDbExist, resetDb} from "$lib/auth.svelte";
     import {goto} from "$app/navigation";
@@ -39,7 +40,7 @@
             await authenticateDb(password);
             isError = false;
             message = "Database initialized successfully.";
-            await goto("/app");
+            await goto(landingPage);
         } catch (err) {
             isError = true;
             message = `Initialization error: ${String(err)}`;
@@ -62,7 +63,7 @@
             await authenticateDb(password);
             isError = false;
             message = "Authentication successful.";
-            await goto("/app");
+            await goto(landingPage);
         } catch (err) {
             isError = true;
             message = "Invalid password.";

@@ -2,6 +2,6 @@
     import AuthPanel from "$lib/components/AuthPanel.svelte";
 </script>
 
-<main class="min-h-screen flex items-center justify-center p-4">
-<AuthPanel />
+<main class="h-full flex items-center justify-center p-4">
+<AuthPanel landingPage = "/dashboard" />
 </main>
