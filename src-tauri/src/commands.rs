@@ -23,6 +23,11 @@ pub async fn is_db_ready(app_state: tauri::State<'_, AppState>) -> Result<bool, 
 }
 
 #[tauri::command]
+pub fn did_auth_succeed(app_state: tauri::State<'_, AppState>) -> bool {
+    app_state.did_auth_succeed.load(std::sync::atomic::Ordering::Relaxed)
+}
+
+#[tauri::command]
 pub async fn init_db(
     app_state: tauri::State<'_, AppState>,
     encryption_key: &str,
@@ -46,7 +51,7 @@ pub async fn init_db(
 
     let mut db_state = app_state.db.write().await;
     *db_state = Some(db);
-
+    app_state.did_auth_succeed.store(true, std::sync::atomic::Ordering::Relaxed);
     Ok(())
 }
 
@@ -56,6 +61,7 @@ pub async fn reset_db(
     purge_data: bool,
 ) -> Result<(), String> {
     {
+        app_state.did_auth_succeed.store(false, std::sync::atomic::Ordering::Relaxed);
         let mut lock = app_state.db.write().await;
         match lock.take() {
             Some(db) => {

@@ -1,7 +1,11 @@
 ﻿import {invoke} from "@tauri-apps/api/core";
 let authSuccess = $state(false);
+
 export function isAuthSuccess(){
-    return authSuccess.valueOf();
+    return authSuccess;
+}
+export async function checkAuthSuccess(){
+    authSuccess = await invoke<boolean>("did_auth_succeed");
 }
 export async function doesDbExist(): Promise<boolean> {
     return await invoke<boolean>("does_db_exist");
@@ -13,7 +17,7 @@ export async function authenticateDb(password: string): Promise<void> {
     if (!ready) {
         throw new Error("Invalid password.");
     }
-    authSuccess = true;
+    await checkAuthSuccess();
 }
 
 export async function resetDb(): Promise<void> {

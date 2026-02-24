@@ -5,7 +5,7 @@ pub mod fs;
 
 #[cfg(debug_assertions)]
 use std::path::PathBuf;
-use std::sync::Arc;
+use std::sync::{atomic, Arc};
 #[cfg(not(debug_assertions))]
 use tauri::path::BaseDirectory;
 use tauri::Manager;
@@ -33,6 +33,7 @@ pub fn run() {
 
             let app_state = AppState {
                 db: Arc::new(RwLock::new(None)),
+                did_auth_succeed: atomic::AtomicBool::new(false),
                 db_dir,
                 migration_dir,
             };
@@ -49,6 +50,7 @@ pub fn run() {
             commands::is_db_ready,
             commands::init_db,
             commands::reset_db,
+            commands::did_auth_succeed,
             db::proxy::execute_single_sql,
             db::proxy::execute_batch_sql,
         ])

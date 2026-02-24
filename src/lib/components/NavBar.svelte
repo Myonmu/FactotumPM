@@ -2,7 +2,7 @@
     import {onMount} from "svelte";
     import {getPrefString, savePrefString} from "$lib/prefStore";
     import {PanelLeftOpen, PanelLeftClose} from "lucide-svelte";
-    import {isAuthSuccess} from "$lib/auth.svelte";
+    import {checkAuthSuccess, isAuthSuccess} from "$lib/auth.svelte";
 
     let {onToggleSidebar, sideBarFolded} = $props();
 
@@ -54,6 +54,7 @@
             currentTheme = saved;
         }
         applyTheme(currentTheme);
+        await checkAuthSuccess();
     });
 
     async function changeTheme(theme: string) {
@@ -82,7 +83,7 @@
     </div>
 
     <div class="absolute left-1/2 transform -translate-x-1/2">
-        <p class="font-extrabold text-xl AppName"> FACTOTUM</p>
+        <p class="font-extrabold text-4xl AppName"> FACTOTUM</p>
     </div>
     <!-- RIGHT SIDE -->
     <div class="flex-none">
