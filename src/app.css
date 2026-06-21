@@ -2,6 +2,11 @@
 @import "tailwindcss/components";
 @import "tailwindcss/utilities";
 
+html,
+body {
+    height: 100%;
+}
+
 @font-face {
     font-family: ArcaneNine;
     src: url('fonts/Arcane Nine.woff2') format('woff2');

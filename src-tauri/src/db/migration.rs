@@ -119,10 +119,21 @@ impl Migration {
 
         for statement in statements {
             let sql_str = statement.to_string();
-            sqlx::query(&sql_str)
-                .execute(&mut *tx)
-                .await
-                .map_err(|e| format!("{}: {}", name, e))?;
+            if let Err(err) = sqlx::query(&sql_str).execute(&mut *tx).await {
+                let err_str = err.to_string();
+                let is_duplicate_column = err_str.to_lowercase().contains("duplicate column name");
+                let is_add_column = sql_str.to_uppercase().contains("ADD COLUMN");
+
+                if is_duplicate_column && is_add_column {
+                    println!(
+                        "[migration] Skipping already-applied ADD COLUMN in {}: {}",
+                        name, err_str
+                    );
+                    continue;
+                }
+
+                return Err(format!("{}: {}", name, err));
+            }
         }
 
         sqlx::query(&format!(

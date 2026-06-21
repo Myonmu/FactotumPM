@@ -14,25 +14,27 @@ pub type DatabaseDialect = sqlx::Sqlite;
 pub type DatabasePool = sqlx::Pool<DatabaseDialect>;
 
 pub struct Database {
-    db_dir: PathBuf,
+    db_path: PathBuf,
     pool: DatabasePool,
 }
 
 impl Database {
     pub const DEFAULT_DB_NAME: &'static str = "FactotumPM.db";
 
-    pub async fn new(password: &str, db_dir: PathBuf) -> Result<Self, String> {
-        // Ensure the directory exists
-        if !db_dir.exists() {
-            std::fs::create_dir_all(&db_dir).map_err(|e| format!("Failed to create db directory: {}", e))?;
+    pub fn default_db_path(db_dir: &PathBuf) -> PathBuf {
+        db_dir.join(Self::DEFAULT_DB_NAME)
+    }
+
+    pub async fn new(password: &str, db_path: PathBuf) -> Result<Self, String> {
+        if let Some(parent) = db_path.parent() {
+            if !parent.exists() {
+                std::fs::create_dir_all(parent)
+                    .map_err(|e| format!("Failed to create db directory: {}", e))?;
+            }
         }
 
-        println!("{}", password);
-
-        let db_url = db_dir.join(Self::DEFAULT_DB_NAME);
-
         let connect_options =
-            SqliteConnectOptions::from_str(&db_url.to_str().ok_or("Invalid db path")?)
+            SqliteConnectOptions::from_str(&db_path.to_str().ok_or("Invalid db path")?)
                 .map_err(|err| err.to_string())?
                 .pragma("key", password.to_string())
                 .pragma("journal_mode", "WAL".to_string())
@@ -49,20 +51,15 @@ impl Database {
             .await
             .map_err(|err| err.to_string())?;
 
-        let result = sqlx::query_as::<_, (String,)>("PRAGMA cipher_version;")
-            .fetch_one(&pool)
-            .await;
-
-        println!("{:?}", result);
-
-        Ok(Self {
-            pool: pool,
-            db_dir: db_dir,
-        })
+        Ok(Self { pool, db_path })
     }
 
     pub fn get_pool(&self) -> &DatabasePool {
-        return &self.pool;
+        &self.pool
+    }
+
+    pub fn db_path(&self) -> &PathBuf {
+        &self.db_path
     }
 
     pub async fn close_pool(&self) {
@@ -75,11 +72,11 @@ impl Database {
                 "SELECT count(*) FROM sqlite_master WHERE type='table' AND name='{}';",
                 Migration::MIGRATION_TABLE_NAME
             )
-                .as_str(),
+            .as_str(),
         )
-            .fetch_one(self.get_pool())
-            .await
-            .ok();
+        .fetch_one(self.get_pool())
+        .await
+        .ok();
 
         if let Some(count) = row {
             return count == 1;
@@ -89,24 +86,32 @@ impl Database {
 
     pub async fn reset(&self) -> Result<(), String> {
         self.close_pool().await;
-        Self::purge_data(&self.db_dir)?;
+        Self::purge_data(&self.db_path)?;
         Ok(())
     }
 
-    pub fn purge_data(db_dir: &PathBuf) -> Result<(), String> {
-        let entries =
-            std::fs::read_dir(db_dir).map_err(|e| format!("Failed to read db directory: {}", e))?;
-        for entry in entries {
-            let entry = entry.map_err(|e| e.to_string())?;
-            let path = entry.path();
+    pub fn purge_data(db_path: &PathBuf) -> Result<(), String> {
+        let file_name = db_path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .ok_or("Invalid database path")?;
 
-            if let Some(fname) = path.file_name().and_then(|n| n.to_str()) {
-                if fname.starts_with(Database::DEFAULT_DB_NAME) {
-                    std::fs::remove_file(&path)
-                        .map_err(|e| format!("Failed to delete {}: {}", fname, e))?;
+        if let Some(parent) = db_path.parent() {
+            let entries = std::fs::read_dir(parent)
+                .map_err(|e| format!("Failed to read db directory: {}", e))?;
+            for entry in entries {
+                let entry = entry.map_err(|e| e.to_string())?;
+                let path = entry.path();
+
+                if let Some(fname) = path.file_name().and_then(|n| n.to_str()) {
+                    if fname.starts_with(file_name) {
+                        std::fs::remove_file(&path)
+                            .map_err(|e| format!("Failed to delete {}: {}", fname, e))?;
+                    }
                 }
             }
         }
+
         Ok(())
     }
 }

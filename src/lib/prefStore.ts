@@ -19,3 +19,17 @@ export async function savePrefString(key: string, value: string) {
     await store.set(key, value);
     await store.save();
 }
+
+export async function getPrefJson<T>(key: string): Promise<T | null> {
+    const raw = await getPrefString(key);
+    if (!raw) return null;
+    try {
+        return JSON.parse(raw) as T;
+    } catch {
+        return null;
+    }
+}
+
+export async function savePrefJson<T>(key: string, value: T) {
+    await savePrefString(key, JSON.stringify(value));
+}

@@ -8,6 +8,111 @@
       "when": 1771635502289,
       "tag": "20260221005822_naive_inhumans",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1750348800000,
+      "tag": "20260619120000_add_task_metrics",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1750352400000,
+      "tag": "20260619130000_add_task_status_machine",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1750356000000,
+      "tag": "20260619140000_rename_edge_label_to_action",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1750359600000,
+      "tag": "20260619150000_add_kanban_status_positions",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1750363200000,
+      "tag": "20260619160000_add_edge_color",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1750366800000,
+      "tag": "20260619170000_add_task_color",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1750370400000,
+      "tag": "20260619180000_clear_implicit_task_colors",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1750377600000,
+      "tag": "20260619200000_add_task_metric_can_estimate",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1750381200000,
+      "tag": "20260620100000_add_task_dependency",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1750384800000,
+      "tag": "20260620110000_add_task_route_positions",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1750388400000,
+      "tag": "20260620120000_add_terminal_status",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "6",
+      "when": 1750392000000,
+      "tag": "20260620130000_add_session_status",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "6",
+      "when": 1750395600000,
+      "tag": "20260620140000_session_tasks_and_status_enum",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "6",
+      "when": 1750399200000,
+      "tag": "20260620150000_rename_certainty_to_uncertainty",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "6",
+      "when": 1750402800000,
+      "tag": "20260621100000_add_task_detail",
+      "breakpoints": true
     }
   ]
 }

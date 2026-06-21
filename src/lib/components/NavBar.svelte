@@ -2,43 +2,43 @@
     import {onMount} from "svelte";
     import {getPrefString, savePrefString} from "$lib/prefStore";
     import {PanelLeftOpen, PanelLeftClose} from "lucide-svelte";
-    import {checkAuthSuccess, isAuthSuccess} from "$lib/auth.svelte";
+    import {checkAuthSuccess, isAuthSuccess, logoutDb} from "$lib/auth.svelte";
 
     let {onToggleSidebar, sideBarFolded} = $props();
 
     const themes = [
-        'light',
-        'dark',
-        'cupcake',
-        'bumblebee',
-        'emerald',
-        'corporate',
-        'synthwave',
-        'retro',
-        'cyberpunk',
-        'valentine',
-        'halloween',
-        'garden',
-        'forest',
-        'aqua',
-        'lofi',
-        'pastel',
-        'fantasy',
-        'wireframe',
-        'black',
-        'luxury',
-        'dracula',
-        'cmyk',
-        'autumn',
-        'business',
-        'acid',
-        'lemonade',
-        'night',
-        'coffee',
-        'winter',
-        'dim',
-        'nord',
-        'sunset',
+        "light",
+        "dark",
+        "cupcake",
+        "bumblebee",
+        "emerald",
+        "corporate",
+        "synthwave",
+        "retro",
+        "cyberpunk",
+        "valentine",
+        "halloween",
+        "garden",
+        "forest",
+        "aqua",
+        "lofi",
+        "pastel",
+        "fantasy",
+        "wireframe",
+        "black",
+        "luxury",
+        "dracula",
+        "cmyk",
+        "autumn",
+        "business",
+        "acid",
+        "lemonade",
+        "night",
+        "coffee",
+        "winter",
+        "dim",
+        "nord",
+        "sunset",
     ]
 
     let currentTheme = $state("synthwave");
@@ -61,6 +61,10 @@
         currentTheme = theme;
         applyTheme(theme);
         await savePrefString(themePrefKey, theme);
+    }
+
+    async function handleLogout() {
+        await logoutDb();
     }
 </script>
 
@@ -86,7 +90,12 @@
         <p class="font-extrabold text-4xl AppName"> FACTOTUM</p>
     </div>
     <!-- RIGHT SIDE -->
-    <div class="flex-none">
+    <div class="flex-none flex items-center gap-2">
+        {#if isAuthSuccess()}
+            <button class="btn btn-sm btn-ghost" onclick={handleLogout}>
+                Logout
+            </button>
+        {/if}
         <div class="dropdown dropdown-end">
             <label tabindex="-1" class="btn btn-sm" for="dd">
                 {currentTheme}

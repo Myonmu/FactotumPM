@@ -6,7 +6,7 @@ const aftermath = sqliteTable('aftermath', {
     id: text().primaryKey().$defaultFn(() => uuid()),
     score: integer('score'), // satisfaction score
     description: text('description'),
-    icon: text('icon'), // actually emoji?
+    icon: text('icon'), // Lucide icon id, e.g. "smile"
     color: integer('color'),
 })
 

@@ -12,6 +12,10 @@ type Method = 'run' | 'all' | 'values' | 'get'
 
 let dbInstance = null as ReturnType<typeof drizzle> | null
 
+export function clearDbInstance() {
+    dbInstance = null
+}
+
 export const getDb = async () => {
     if (dbInstance !== null) return dbInstance
 
@@ -23,6 +27,8 @@ export const getDb = async () => {
             console.warn("Database not yet initialized. Please call init_db first.")
             return null
         }
+
+        await invoke('run_pending_migrations')
 
         dbInstance = drizzle(
             async (sql, params, method) => {
@@ -94,7 +100,7 @@ export const checkDbStatus = async (): Promise<boolean> => {
 
 export const initDbWithPassword = async (password: string): Promise<boolean> => {
     try {
-        await invoke('init_db', { encryptionKey: password })
+        await invoke('init_db', { encryptionKey: password, dbPath: null })
 
         // Wait a moment for the database to fully initialize
         await new Promise(resolve => setTimeout(resolve, 100))
@@ -105,3 +111,44 @@ export const initDbWithPassword = async (password: string): Promise<boolean> => 
         return false
     }
 }
+
+export const db = drizzle(
+    async (sql, params, method) => {
+        const rows = await invoke<Row[]>('execute_single_sql', {
+            query: { sql, params },
+        })
+        /**
+         * Response type:
+         * {rows: string[]} for 'get'
+         * {rows: string[][]} for rest
+         *
+         * More info: https://orm.drizzle.team/docs/connect-drizzle-proxy
+         */
+        return mapRows(rows, method)
+    },
+    async (
+        queries: {
+            sql: string
+            params: any[]
+            method: Method
+        }[],
+    ) => {
+        const batchRows = await invoke<Row[][]>('execute_batch_sql', {
+            queries,
+        })
+        /**
+         * Response type:
+         * {rows: string[]}[] for 'get'
+         * {rows: string[][]}[] for rest
+         * More info: https://orm.drizzle.team/docs/connect-drizzle-proxy
+         */
+        return batchRows.map((rows, index) => {
+            const query = queries[index]
+            return mapRows(rows, query.method)
+        })
+    },
+    {
+        schema,
+        logger: import.meta.env.DEV,
+    },
+)

@@ -16,12 +16,13 @@ pub struct SQLRow {
     pub rows: Vec<Value>,
 }
 
-fn bind_params<'a>(
+pub(crate) fn bind_params<'a>(
     mut query: sqlx::query::Query<'a, Sqlite, sqlx::sqlite::SqliteArguments<'a>>,
     params: &'a [Value],
 ) -> sqlx::query::Query<'a, Sqlite, sqlx::sqlite::SqliteArguments<'a>> {
     for p in params {
         match p {
+            Value::String(s) if s == "null" => query = query.bind(None::<String>),
             Value::String(s) => query = query.bind(s),
             Value::Number(n) => {
                 if let Some(i) = n.as_i64() {
@@ -41,7 +42,7 @@ fn bind_params<'a>(
     query
 }
 
-fn row_to_sql_row(row: &SqliteRow) -> SQLRow {
+pub(crate) fn row_to_sql_row(row: &SqliteRow) -> SQLRow {
     let columns: Vec<String> = row.columns().iter().map(|c| c.name().to_string()).collect();
     let values: Vec<Value> = (0..row.len()).map(|i| sqlx_value_to_json(row, i)).collect();
 
@@ -84,16 +85,22 @@ fn sqlx_value_to_json(row: &SqliteRow, index: usize) -> Value {
     }
 }
 
+fn format_sql_param(value: &Value) -> String {
+    match value {
+        Value::Null => "NULL".to_string(),
+        Value::String(text) => format!("String({text:?})"),
+        Value::Number(number) => format!("Number({number})"),
+        Value::Bool(flag) => format!("Bool({flag})"),
+        other => format!("{other}"),
+    }
+}
+
 fn log_sql_proxy(single: Option<&SQLQuery>, batch: Option<&[SQLQuery]>) {
     if let Some(query) = single {
         println!(
             "[proxy] Single SQL: {}; PARAMS: {:?}",
             query.sql,
-            query
-                .params
-                .iter()
-                .map(|p| serde_json::to_string_pretty(&p.to_string()))
-                .collect::<Vec<_>>()
+            query.params.iter().map(format_sql_param).collect::<Vec<_>>()
         );
     }
 
@@ -106,10 +113,7 @@ fn log_sql_proxy(single: Option<&SQLQuery>, batch: Option<&[SQLQuery]>) {
                 .map(|q| format!(
                     "SQL: {}; PARAMS: {:?}",
                     q.sql,
-                    q.params
-                        .iter()
-                        .map(|p| serde_json::to_string_pretty(&p.to_string()))
-                        .collect::<Vec<_>>()
+                    q.params.iter().map(format_sql_param).collect::<Vec<_>>()
                 ))
                 .collect::<Vec<_>>()
                 .join("\n")

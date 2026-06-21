@@ -3,8 +3,9 @@
 
     let {folded} = $props();
 
-    import {Candy, SquareKanban, Database, CalendarDays, Route, Trophy} from "lucide-svelte";
-    import {isLoading} from "$lib/globalState.svelte";
+    import {Candy, SquareKanban, Database, CalendarDays, Route, Trophy, GitBranch} from "lucide-svelte";
+    import {onMount} from "svelte";
+
 
     const tabs = [
         {id: "dashboard", label: "Dashboard", href: "/dashboard", icon: Candy},
@@ -12,6 +13,7 @@
         {id: "calendar", label: "Calendar", href: "/calendar", icon: CalendarDays},
         {id: "route", label: "Route", href: "/route", icon: Route},
         {id: "trophy", label: "Trophy", href: "/trophy", icon: Trophy},
+        {id: "statuses", label: "Statuses", href: "/statuses", icon: GitBranch},
         {id: "dataview", label: "Data View", href: "/dataview", icon: Database},
     ];
 
@@ -19,12 +21,17 @@
         folded ? "w-0" : "w-16"
     );
 
-    let activeTab = $state(tabs[0]?.id);
+    let activeTab = $state();
 
-    async function changeTab(id: string, href: string){
+    async function changeTab(id: string, href: string) {
         activeTab = id;
+        sessionStorage.setItem("activeTab", id);
         await goto(href);
     }
+
+    onMount(()=>{
+        activeTab = sessionStorage.getItem("activeTab") ?? tabs[0]?.id;
+    })
 </script>
 
 <aside
@@ -37,15 +44,20 @@
 
         {#each tabs as {id, href, label, icon: Icon} (id)}
             <button
-                    class="flex items-center rounded-btn p-3 hover:bg-base-200 transition-colors w-full my-2"
-                    class:bg-base-300={activeTab === id}
+                    class="flex items-center rounded-btn p-3 transition-colors w-full my-2"
+                    class:hover:bg-base-300={activeTab !== id}
+                    class:bg-primary={activeTab === id}
                     onclick={() => changeTab(id, href)}
             >
-                <Icon class="w-6 h-6 shrink-0"/>
-
+                {#if activeTab === id}
+                    <Icon class="w-6 h-6 shrink-0" color="oklch(var(--pc))"/>
+                {:else }
+                    <Icon class="w-6 h-6 shrink-0"/>
+                {/if}
                 <span
                         class="whitespace-nowrap overflow-hidden transition-all duration-300 font-semibold ml-3
                            opacity-0 group-hover:opacity-100"
+                        class:text-primary-content={activeTab === id}
                 >
                     {label}
                 </span>
