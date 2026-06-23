@@ -52,12 +52,15 @@
         buildTraditionalColumnPosUpdates,
         reorderStatusesById,
     } from '$lib/kanban/traditionalColumnOrder'
+    import { getCurrentProjectId } from '$lib/projectState.svelte'
 
     let {
         globalFilters = DEFAULT_KANBAN_GLOBAL_FILTERS,
     }: {
         globalFilters?: KanbanGlobalFilters
     } = $props()
+
+    const currentProjectId = $derived(getCurrentProjectId())
 
     function sqliteTimestamp(): string {
         return new Date().toISOString().replace('T', ' ').slice(0, 19)
@@ -134,11 +137,12 @@
     })
 
     async function refreshTaskContext() {
+        const projectId = currentProjectId
         const [loadedDomains, loadedTasks, loadedStatuses, machine, loadedDependencies] = await Promise.all([
-            loadDomainOptions(),
-            loadTaskOptions(),
+            loadDomainOptions(projectId),
+            loadTaskOptions(projectId),
             loadTaskStatusOptions(),
-            loadTaskStatusMachine(),
+            loadTaskStatusMachine(projectId),
             loadTaskDependencyEdges(),
         ])
         domains = loadedDomains
@@ -153,9 +157,10 @@
         error = null
 
         try {
+            const projectId = currentProjectId
             const [{ statuses: loadedStatuses, edges: loadedEdges }, taskResult] = await Promise.all([
-                loadTaskStatusMachine(),
-                fetchTableRows('task'),
+                loadTaskStatusMachine(projectId),
+                fetchTableRows('task', projectId),
             ])
 
             statuses = loadedStatuses
@@ -419,8 +424,15 @@
         }
     }
 
+    let initialized = false
+
     onMount(() => {
-        void loadBoard()
+        void loadBoard().then(() => { initialized = true })
+    })
+
+    $effect(() => {
+        const _pid = currentProjectId
+        if (initialized) void loadBoard()
     })
 </script>
 

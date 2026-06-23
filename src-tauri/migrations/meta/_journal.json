@@ -108,10 +108,17 @@
       "breakpoints": true
     },
     {
-      "idx": 16,
+      "idx": 17,
       "version": "6",
-      "when": 1750402800000,
-      "tag": "20260621100000_add_task_detail",
+      "when": 1750406400000,
+      "tag": "20260621110000_add_observation",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "6",
+      "when": 1750579200000,
+      "tag": "20260622110000_typed_booleans",
       "breakpoints": true
     }
   ]

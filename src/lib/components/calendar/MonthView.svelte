@@ -7,6 +7,7 @@
         WEEKDAY_LABELS,
     } from '$lib/calendar/dates'
     import { dayFromPointer, moveSessionToDay } from '$lib/calendar/sessionTiming'
+    import type { DomainOption } from '$lib/db/dataView'
     import type { SessionRecord } from '$lib/db/sessions'
 
     const MAX_VISIBLE_SESSIONS = 3
@@ -15,6 +16,7 @@
         days,
         anchorMonth,
         sessions = [],
+        domains = [],
         onDayClick,
         onSessionClick,
         onCreateSession,
@@ -23,6 +25,7 @@
         days: Date[]
         anchorMonth: number
         sessions?: SessionRecord[]
+        domains?: DomainOption[]
         onDayClick?: (day: Date) => void
         onSessionClick?: (session: SessionRecord) => void
         onCreateSession?: (day: Date) => void
@@ -97,17 +100,20 @@
         {/each}
     </div>
 
-    <div class="grid min-h-0 flex-1 auto-rows-fr grid-cols-7">
+    <div class="grid min-h-0 flex-1 grid-cols-7 grid-rows-6">
         {#each days as day (day.toISOString())}
             {@const daySessions = sessionsForDay(day)}
             {@const overflowCount = daySessions.length - MAX_VISIBLE_SESSIONS}
             <div
                     data-calendar-day={day.toISOString()}
-                    class="day-cell group relative min-h-28 border-b border-r border-base-300 p-2 transition-colors {day.getMonth() !== anchorMonth ? 'bg-base-200/40' : ''} {isDropTarget(day) ? 'bg-primary/10' : ''}"
-                    class:ring-2={isToday(day) || isDropTarget(day)}
-                    class:ring-primary={isToday(day) || isDropTarget(day)}
-                    class:ring-inset={isToday(day) || isDropTarget(day)}
+                    class="day-cell group relative min-h-0 overflow-hidden border-b border-r border-base-300 p-2 transition-colors {day.getMonth() !== anchorMonth ? 'bg-base-200/40' : ''} {isDropTarget(day) ? 'bg-primary/10' : ''}"
             >
+                {#if isToday(day) || isDropTarget(day)}
+                    <div
+                            class="pointer-events-none absolute inset-0 z-10 box-border border-2 border-primary"
+                            aria-hidden="true"
+                    ></div>
+                {/if}
                 <div class="mb-1 flex items-center justify-between gap-1">
                     <button
                             type="button"
@@ -131,6 +137,7 @@
                     {#each daySessions.slice(0, MAX_VISIBLE_SESSIONS) as session (session.id)}
                         <SessionBlock
                                 {session}
+                                {domains}
                                 compact
                                 dragging={draggingSessionId === session.id}
                                 onclick={() => onSessionClick?.(session)}

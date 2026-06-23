@@ -245,6 +245,18 @@ pub async fn ensure_default_prompts(
     fs::copy_bundled_prompts(
         &app_state.bundled_prompts_dir,
         &app_state.prompts_dir,
+        false,
+    )
+}
+
+#[tauri::command]
+pub async fn reload_bundled_prompts(
+    app_state: tauri::State<'_, AppState>,
+) -> Result<Vec<String>, String> {
+    fs::copy_bundled_prompts(
+        &app_state.bundled_prompts_dir,
+        &app_state.prompts_dir,
+        true,
     )
 }
 

@@ -1,0 +1,71 @@
+/* DaisyUI-aware theme for @xyflow/svelte — import after @xyflow/svelte/dist/style.css */
+
+.svelte-flow {
+    --xy-edge-stroke-default: oklch(var(--bc) / 0.45);
+    --xy-edge-stroke-selected-default: oklch(var(--p));
+    --xy-connectionline-stroke-default: oklch(var(--bc) / 0.45);
+
+    --xy-edge-label-background-color-default: oklch(var(--b1));
+    --xy-edge-label-color-default: oklch(var(--bc));
+
+    --xy-background-color-default: oklch(var(--b1));
+    --xy-background-pattern-dots-color-default: oklch(var(--bc) / 0.2);
+    --xy-background-pattern-lines-color-default: oklch(var(--bc) / 0.15);
+    --xy-background-pattern-cross-color-default: oklch(var(--bc) / 0.15);
+
+    --xy-attribution-background-color-default: color-mix(
+        in oklch,
+        oklch(var(--b2)) 88%,
+        transparent
+    );
+
+    --xy-minimap-background-color-default: oklch(var(--b2));
+    --xy-minimap-mask-background-color-default: color-mix(
+        in oklch,
+        oklch(var(--b1)) 40%,
+        transparent
+    );
+    --xy-minimap-mask-stroke-color-default: oklch(var(--bc) / 0.25);
+    --xy-minimap-node-background-color-default: oklch(var(--p));
+    --xy-minimap-node-stroke-color-default: transparent;
+
+    --xy-controls-button-background-color-default: oklch(var(--b2));
+    --xy-controls-button-background-color-hover-default: oklch(var(--b3));
+    --xy-controls-button-color-default: oklch(var(--bc));
+    --xy-controls-button-color-hover-default: oklch(var(--bc));
+    --xy-controls-button-border-color-default: oklch(var(--bc) / 0.15);
+    --xy-controls-box-shadow-default: 0 1px 3px oklch(var(--bc) / 0.12);
+
+    --xy-handle-background-color-default: oklch(var(--bc) / 0.55);
+    --xy-handle-border-color-default: oklch(var(--b1));
+}
+
+.svelte-flow__controls {
+    border: 1px solid oklch(var(--bc) / 0.12);
+    border-radius: var(--rounded-box, 0.5rem);
+    overflow: hidden;
+}
+
+.svelte-flow__minimap {
+    border: 1px solid oklch(var(--bc) / 0.12);
+    border-radius: var(--rounded-box, 0.5rem);
+    overflow: hidden;
+}
+
+.svelte-flow__attribution a {
+    color: oklch(var(--bc) / 0.45);
+}
+
+.svelte-flow__edge-path {
+    stroke-linecap: round;
+}
+
+.svelte-flow__edge-label {
+    color: oklch(var(--bc));
+    background: oklch(var(--b1));
+    border: 1px solid oklch(var(--bc) / 0.2);
+    border-radius: 4px;
+    padding: 2px 6px;
+    font-size: 11px;
+    line-height: 1.2;
+}

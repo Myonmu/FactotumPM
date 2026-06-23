@@ -30,6 +30,7 @@
         updateSession,
     } from '$lib/db/sessions'
     import { closeInspector, openInspector, updateInspectorProps } from '$lib/inspector.svelte'
+    import { getCurrentProjectId } from '$lib/projectState.svelte'
 
     let viewMode = $state<CalendarViewMode>('month')
     let anchorDate = $state(startOfDay(new Date()))
@@ -45,6 +46,7 @@
 
     let snapMinutes = $state(DEFAULT_SNAP_MINUTES)
 
+    const currentProjectId = $derived(getCurrentProjectId())
     const monthDays = $derived(getMonthGrid(anchorDate))
     const weekDays = $derived(getWeekDays(anchorDate))
 
@@ -55,7 +57,8 @@
     })
 
     async function refreshSessions() {
-        sessions = await loadSessions()
+        // Calendar: All Projects shows ALL sessions; specific project filters
+        sessions = await loadSessions(currentProjectId)
     }
 
     async function loadContext() {
@@ -63,8 +66,9 @@
         error = null
 
         try {
-            taskOptions = await loadTaskOptions()
-            domains = await loadDomainOptions()
+            const projectId = currentProjectId
+            taskOptions = await loadTaskOptions(projectId)
+            domains = await loadDomainOptions(projectId)
             await refreshSessions()
         } catch (err) {
             error = err instanceof Error ? err.message : 'Failed to load calendar data'
@@ -72,6 +76,8 @@
             loading = false
         }
     }
+
+    let initialized = false
 
     function buildSessionInspectorProps(session: SessionInput, isSaving = saving) {
         return {
@@ -229,11 +235,16 @@
             snapMinutes = clampSnapMinutes(Number(stored))
         }
 
-        loadContext()
+        void loadContext().then(() => { initialized = true })
+    })
+
+    $effect(() => {
+        const _pid = currentProjectId
+        if (initialized) void loadContext()
     })
 </script>
 
-<div class="flex h-full min-h-0 flex-col bg-base-200">
+<div class="flex min-h-0 flex-1 flex-col bg-base-200">
     <div class="sticky top-0 z-30 border-b border-base-300 bg-base-200/95 px-4 py-3 backdrop-blur">
         <div class="flex flex-wrap items-center justify-between gap-4">
             <div>
@@ -337,6 +348,7 @@
                     days={monthDays}
                     anchorMonth={anchorDate.getMonth()}
                     sessions={sessions}
+                    {domains}
                     onDayClick={handleDayClick}
                     onSessionClick={handleSessionClick}
                     onCreateSession={(day: Date) => openNewSession(day)}

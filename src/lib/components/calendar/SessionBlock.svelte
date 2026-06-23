@@ -1,13 +1,18 @@
 <script lang="ts">
+    import { onMount } from 'svelte'
+
+    import DomainIconInline from '$lib/components/DomainIconInline.svelte'
     import type { SessionRecord } from '$lib/db/sessions'
     import { getSessionDisplayTitle } from '$lib/db/sessions'
     import { parseSqlTimestamp } from '$lib/calendar/dates'
     import { formatSessionRelativeTime } from '$lib/calendar/sessionRelativeTime'
+    import { loadDomainOptions, type DomainOption } from '$lib/db/dataView'
     import { sessionHasEvaluatedAftermath } from '$lib/dashboard/sessionUtils'
     import { mixDisplayColorInt } from '$lib/grid/colorUtils'
 
     let {
         session,
+        domains: domainsProp = [],
         compact = false,
         fill = false,
         showTime = true,
@@ -19,6 +24,7 @@
         onPointerDragStart,
     }: {
         session: SessionRecord
+        domains?: DomainOption[]
         compact?: boolean
         fill?: boolean
         showTime?: boolean
@@ -29,6 +35,18 @@
         onclick?: () => void
         onPointerDragStart?: (event: PointerEvent) => void
     } = $props()
+
+    let loadedDomains = $state<DomainOption[]>([])
+
+    const domains = $derived(domainsProp.length > 0 ? domainsProp : loadedDomains)
+    const primaryDomainId = $derived(session.tasks[0]?.domain_id ?? null)
+
+    onMount(() => {
+        if (domainsProp.length > 0) return
+        void loadDomainOptions().then((loaded) => {
+            loadedDomains = loaded
+        })
+    })
 
     let didDrag = $state(false)
     let pointerStartX = 0
@@ -132,7 +150,10 @@
         onpointerdown={handlePointerDown}
         onclick={handleClick}
 >
-    <span class="block truncate font-medium leading-tight">{label}</span>
+    <span class="flex min-w-0 items-center gap-1.5 truncate font-medium leading-tight">
+        <DomainIconInline domainId={primaryDomainId} {domains} size={14} />
+        <span class="truncate">{label}</span>
+    </span>
     {#if showTime && timeLabel}
         <span class="block truncate text-[0.7rem] text-base-content/70">{timeLabel}</span>
     {/if}
@@ -150,7 +171,10 @@
         style:background-color={fill ? 'transparent' : `color-mix(in srgb, ${displayColor} 18%, transparent)`}
         style:border-color={fill ? 'transparent' : displayColor}
 >
-    <span class="block truncate font-medium leading-tight">{label}</span>
+    <span class="flex min-w-0 items-center gap-1.5 truncate font-medium leading-tight">
+        <DomainIconInline domainId={primaryDomainId} {domains} size={14} />
+        <span class="truncate">{label}</span>
+    </span>
     {#if showTime && timeLabel}
         <span class="block truncate text-[0.7rem] text-base-content/70">{timeLabel}</span>
     {/if}

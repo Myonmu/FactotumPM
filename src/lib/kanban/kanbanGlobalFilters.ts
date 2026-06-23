@@ -65,7 +65,7 @@ export function applyKanbanGlobalFilters(
     let result = tasks
 
     if (filters.ignoreTrophyTasks) {
-        result = result.filter((task) => Number(task.is_trophy) !== 1)
+        result = result.filter((task) => !task.is_trophy)
     }
 
     if (filters.ignoreTasksWithChildren) {

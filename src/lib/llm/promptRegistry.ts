@@ -34,6 +34,11 @@ const DEFAULT_PROMPT_FILES: Array<{
         name: 'Data explorer',
         description: 'Explore and present any queryable project data',
     },
+    {
+        fileName: 'learn.md',
+        name: 'Learn',
+        description: 'Analyze session patterns and save behavioral observations',
+    },
 ]
 
 function createId(): string {
@@ -78,6 +83,41 @@ async function seedDefaultPromptEntries(promptsDir: string): Promise<PromptEntry
     return entries
 }
 
+function entryFileName(entry: PromptEntry): string {
+    const path = entry.relativePath || entry.absolutePath
+    return path.split(/[/\\]/).pop() ?? ''
+}
+
+async function ensureMissingDefaultPrompts(registry: PromptRegistry): Promise<PromptRegistry> {
+    const promptsDir = await invoke<string>('get_prompts_dir')
+    await invoke<string[]>('ensure_default_prompts')
+
+    const existingFiles = new Set(registry.entries.map(entryFileName))
+    const missing = DEFAULT_PROMPT_FILES.filter((spec) => !existingFiles.has(spec.fileName))
+    if (missing.length === 0) {
+        return registry
+    }
+
+    const entries = [...registry.entries]
+    for (const spec of missing) {
+        entries.push(await registerPromptsDirFile(promptsDir, spec.fileName, spec))
+    }
+
+    const next = { ...registry, entries }
+    await savePromptRegistry(next)
+    return next
+}
+
+export async function reloadBundledPrompts(): Promise<string[]> {
+    return invoke<string[]>('reload_bundled_prompts')
+}
+
+/** Re-copy bundled default prompts and refresh registry entries from disk. */
+export async function reloadPromptRegistry(): Promise<PromptRegistry> {
+    await reloadBundledPrompts()
+    return loadPromptRegistry()
+}
+
 export async function loadPromptRegistry(): Promise<PromptRegistry> {
     const promptsDir = await invoke<string>('get_prompts_dir')
     const stored = await getPrefJson<PromptRegistry>(REGISTRY_KEY)
@@ -92,6 +132,8 @@ export async function loadPromptRegistry(): Promise<PromptRegistry> {
             lastSelectedId: null,
         }
         await savePromptRegistry(registry)
+    } else {
+        registry = await ensureMissingDefaultPrompts(registry)
     }
 
     return registry

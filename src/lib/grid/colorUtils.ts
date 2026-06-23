@@ -35,6 +35,7 @@ export function mixDisplayColorInt(
 export type DomainColorNode = {
     id: string
     color?: number | null
+    icon?: string | null
     parent_domain_id?: string | null
 }
 
@@ -45,6 +46,11 @@ function readColorInt(value: unknown): number | null {
 }
 
 function readParentDomainId(value: unknown): string | null {
+    if (value == null || value === '') return null
+    return String(value)
+}
+
+function readIcon(value: unknown): string | null {
     if (value == null || value === '') return null
     return String(value)
 }
@@ -67,6 +73,31 @@ export function resolveDomainColor(
 
         const color = readColorInt(domain.color)
         if (color != null) return color
+
+        currentId = readParentDomainId(domain.parent_domain_id)
+    }
+
+    return null
+}
+
+/** Effective domain icon: own icon, else walk parent_domain_id chain. */
+export function resolveDomainIcon(
+    domainId: string | null | undefined,
+    domains: DomainColorNode[] = [],
+): string | null {
+    if (!domainId) return null
+
+    const byId = new Map(domains.map((domain) => [domain.id, domain]))
+    let currentId: string | null = domainId
+    const visited = new Set<string>()
+
+    while (currentId && !visited.has(currentId)) {
+        visited.add(currentId)
+        const domain = byId.get(currentId)
+        if (!domain) break
+
+        const icon = readIcon(domain.icon)
+        if (icon != null) return icon
 
         currentId = readParentDomainId(domain.parent_domain_id)
     }

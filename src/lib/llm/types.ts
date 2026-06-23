@@ -1,13 +1,23 @@
-/** Entity tables the LLM may query and present (excludes edge/junction/internal tables). */
+/** Entity tables the agent presents in typed `<factotum-view>` blocks. */
 export const QUERYABLE_TABLES = [
     'task',
     'domain',
     'session',
     'aftermath',
     'task_status',
+    'observation',
 ] as const
 
 export type QueryableTableName = (typeof QUERYABLE_TABLES)[number]
+
+/** Junction/edge tables — join freely in SQL; not used as `<factotum-view>` types. */
+export const JOINABLE_TABLES = [
+    'session_edge',
+    'task_dependency',
+    'task_status_edge',
+] as const
+
+export type JoinableTableName = (typeof JOINABLE_TABLES)[number]
 
 export const VIEW_TYPES = [
     'table',
@@ -67,6 +77,27 @@ export type AgentResult = {
     views: ResolvedFactotumView[]
     steps: AgentStep[]
     usedLlm: boolean
+    observations?: {
+        applied: Array<{
+            action: 'create' | 'update'
+            record: {
+                id: string
+                content: string
+                confidence: number
+            }
+        }>
+        failed: Array<{
+            input: ParsedObservation
+            error: string
+        }>
+    }
+}
+
+export type ParsedObservation = {
+    action: 'create' | 'update'
+    id?: string
+    content?: string
+    confidence: number
 }
 
 /** @deprecated Use AgentResult */
@@ -110,6 +141,11 @@ export type LlmChatRequest = {
     messages: ChatMessage[]
     temperature?: number
     jsonMode?: boolean
+}
+
+export type LlmChatResponse = {
+    content: string
+    reasoningContent: string | null
 }
 
 export type SqlRow = {

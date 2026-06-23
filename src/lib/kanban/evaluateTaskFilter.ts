@@ -193,8 +193,8 @@ function evaluateCondition(task: TaskRecord, condition: FilterCondition): boolea
         case 'metric':
             return evaluateMetricOperator(condition.operator, task, condition.field, condition.value)
         case 'boolean':
-            if (condition.operator === 'is_true') return Number(task.is_trophy) === 1
-            if (condition.operator === 'is_false') return Number(task.is_trophy) !== 1
+            if (condition.operator === 'is_true') return Boolean(task.is_trophy)
+            if (condition.operator === 'is_false') return !task.is_trophy
             return false
         case 'datetime':
             return evaluateDateOperator(

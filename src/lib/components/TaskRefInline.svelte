@@ -2,6 +2,7 @@
     import { Anvil, Clock, Dices, Puzzle, Trophy } from 'lucide-svelte'
     import { onMount } from 'svelte'
 
+    import DomainIconInline from '$lib/components/DomainIconInline.svelte'
     import type { DomainOption, TaskRef } from '$lib/db/dataView'
     import { ensureSessionTimeMaps, getTaskTimeMs } from '$lib/sessionTime.svelte'
     import { formatMetricDisplay, isMetricConfigured } from '$lib/taskMetrics'
@@ -10,10 +11,12 @@
     let {
         task,
         domains = [],
+        expanded = false,
         class: className = '',
     }: {
         task: TaskRef
         domains?: DomainOption[]
+        expanded?: boolean
         class?: string
     } = $props()
 
@@ -36,8 +39,16 @@
     })
 </script>
 
-<span class="flex min-w-0 flex-1 items-center gap-2 {className}">
-    <span class="min-w-0 flex-1 truncate text-sm font-medium leading-none">{task.title}</span>
+<span
+        class="flex min-w-0 flex-1 items-center gap-2 {className}"
+        class:flex-wrap={expanded}
+>
+    <DomainIconInline domainId={task.domain_id} {domains} />
+    <span
+            class="min-w-0 flex-1 text-sm font-medium leading-snug"
+            class:truncate={!expanded}
+            class:whitespace-normal={expanded}
+    >{task.title}</span>
 
     {#if task.is_trophy}
         <Trophy class="h-3.5 w-3.5 shrink-0" color="oklch(var(--p))" />

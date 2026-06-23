@@ -140,7 +140,7 @@
 
             {#if data.isTerminal}
                 <span class="tooltip tooltip-right" data-tip="Terminal status">
-                    <CircleStop class="w-4 h-4 shrink-0 text-neutral" />
+                    <CircleStop class="w-4 h-4 shrink-0 text-base-content/50" />
                 </span>
             {/if}
 

@@ -365,7 +365,7 @@ export function computeTrophies(
 ): TrophyView[] {
     const ctx = buildContext(tasks, terminalStatusIds, sessionTime)
     return tasks
-        .filter((task) => Number(task.is_trophy) === 1)
+        .filter((task) => task.is_trophy)
         .map((task) => buildTrophyView(task, ctx))
 }
 
@@ -378,7 +378,7 @@ export function computeTrophyViewsByTaskId(
     const ctx = buildContext(tasks, terminalStatusIds, sessionTime)
     const result = new Map<string, TrophyView>()
     for (const task of tasks) {
-        if (Number(task.is_trophy) === 1) {
+        if (task.is_trophy) {
             result.set(task.id, buildTrophyView(task, ctx))
         }
     }

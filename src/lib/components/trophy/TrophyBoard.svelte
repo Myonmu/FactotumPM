@@ -47,6 +47,7 @@
         saveTrophyViewMode,
         type TrophyViewMode,
     } from '$lib/trophy/trophyPrefs'
+    import { getCurrentProjectId, getProjects } from '$lib/projectState.svelte'
 
     let tasks = $state<TaskRecord[]>([])
     let domains = $state<DomainOption[]>([])
@@ -63,17 +64,36 @@
     let loading = $state(true)
     let error = $state<string | null>(null)
 
+    const currentProjectId = $derived(getCurrentProjectId())
+    const projects = $derived(getProjects())
+    const isAllProjects = $derived(currentProjectId === null)
+
+    // When in All Projects, dependency graph needs a local selector
+    let dependencyProjectId = $state<string | null>(null)
+    const effectiveDependencyProjectId = $derived(
+        isAllProjects ? dependencyProjectId : currentProjectId,
+    )
+
     const trophies = $derived(computeTrophies(tasks, terminalStatusIds, sessionTime))
     const visibleTrophies = $derived(sortTrophies(filterTrophies(trophies, filter), sort))
     const groups = $derived(groupTrophies(visibleTrophies, groupField, { domains, statuses }))
 
     const achievedCount = $derived(trophies.filter((trophy) => trophy.achieved).length)
 
+    // For dependency graph: filter tasks to selected project if needed
+    const dependencyTasks = $derived(
+        effectiveDependencyProjectId != null
+            ? tasks.filter((t) => t.project_id === effectiveDependencyProjectId)
+            : tasks,
+    )
+
     async function loadBoard() {
         loading = true
         error = null
 
         try {
+            // Trophy grid: in All Projects mode, load all tasks; in project mode, filter
+            const projectId = currentProjectId
             const [
                 taskResult,
                 loadedDomains,
@@ -82,9 +102,9 @@
                 loadedDependencies,
                 loadedSessionTime,
             ] = await Promise.all([
-                fetchTableRows('task'),
-                loadDomainOptions(),
-                loadTaskStatusMachine(),
+                fetchTableRows('task', projectId),
+                loadDomainOptions(projectId),
+                loadTaskStatusMachine(projectId),
                 loadTaskStatusOptions(),
                 loadTaskDependencyEdges(),
                 loadSessionTimeIndex(),
@@ -133,6 +153,8 @@
         void goto('/route')
     }
 
+    let initialized = false
+
     onMount(async () => {
         const [savedFilter, savedSort, savedGroup, savedViewMode] = await Promise.all([
             loadTrophyFilter(),
@@ -145,6 +167,12 @@
         groupField = savedGroup
         viewMode = savedViewMode
         await loadBoard()
+        initialized = true
+    })
+
+    $effect(() => {
+        const _pid = currentProjectId
+        if (initialized) void loadBoard()
     })
 </script>
 
@@ -229,16 +257,36 @@
             {/if}
         </div>
     {:else}
-        <div class="flex min-h-0 flex-1 flex-col">
-            <div class="mb-2 flex items-center gap-2">
-                <Network class="h-4 w-4 text-base-content/60" />
-                <p class="text-sm text-base-content/70">
-                    Trophy dependency tree. Regular tasks are collapsed into the trophy they belong to.
-                    Click a trophy to open its route.
-                </p>
+        <div class="flex min-h-0 flex-1 flex-col gap-2">
+            <div class="flex flex-wrap items-center gap-3">
+                <div class="flex items-center gap-2">
+                    <Network class="h-4 w-4 text-base-content/60" />
+                    <p class="text-sm text-base-content/70">
+                        Trophy dependency tree. Regular tasks are collapsed into the trophy they belong to.
+                        Click a trophy to open its route.
+                    </p>
+                </div>
+                {#if isAllProjects}
+                    <div class="flex items-center gap-2 ml-auto">
+                        <span class="text-xs font-semibold uppercase tracking-wide text-base-content/60">Project</span>
+                        <select
+                            class="select select-bordered select-sm h-9 min-h-9 py-0 text-sm leading-normal"
+                            value={dependencyProjectId ?? ''}
+                            onchange={(e) => {
+                                const val = (e.currentTarget as HTMLSelectElement).value
+                                dependencyProjectId = val || null
+                            }}
+                        >
+                            <option value="">All Projects</option>
+                            {#each projects as proj (proj.id)}
+                                <option value={proj.id}>{proj.name}</option>
+                            {/each}
+                        </select>
+                    </div>
+                {/if}
             </div>
             <TrophyProgressionGraph
-                    {tasks}
+                    tasks={dependencyTasks}
                     {dependencies}
                     {domains}
                     {terminalStatusIds}

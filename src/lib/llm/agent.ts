@@ -1,13 +1,18 @@
 import { llmChat, executeReadonlySql, sqlRowsToRecords } from './client'
 import { isLlmConfigured, loadLlmConfig } from './config'
 import {
+    combineAssistantResponse,
     extractNarrative,
+    extractProtocolParseableContent,
+    formatAssistantStepDetail,
     formatToolResult,
+    parseObservationBlocks,
     parseToolCalls,
     parseViewBlocks,
 } from './agentProtocol'
+import { applyObservationBlocks } from './observationPersistence'
 import { resolveViews } from './views'
-import { expandPromptTokens } from './tokens'
+import { expandDynamicPromptTokens, expandPromptTokens, expandStaticPromptTokens } from './tokens'
 import {
     loadPromptRegistry,
     pickDefaultPromptEntry,
@@ -26,6 +31,20 @@ import type {
 import { selectIncludesPrimaryKey } from './viewIdEnforcement'
 
 const MAX_AGENT_STEPS = 10
+const LEARN_AGENT_STEPS = 15
+
+function isLearnPromptEntry(entry: { relativePath: string; absolutePath: string; name: string }): boolean {
+    const path = `${entry.relativePath}/${entry.absolutePath}`.toLowerCase()
+    return path.includes('learn.md') || entry.name.toLowerCase() === 'learn'
+}
+
+async function resolveMaxAgentSteps(promptId?: string | null): Promise<number> {
+    const registry = await loadPromptRegistry()
+    const entries = await resolveAllPromptEntries(registry)
+    const selectedId = promptId ?? (await getSelectedPromptId()) ?? registry.lastSelectedId
+    const entry = pickDefaultPromptEntry(entries, selectedId)
+    return entry && isLearnPromptEntry(entry) ? LEARN_AGENT_STEPS : MAX_AGENT_STEPS
+}
 
 async function executeToolQuery(sql: string): Promise<AgentToolResult> {
     try {
@@ -58,7 +77,7 @@ async function executeToolQuery(sql: string): Promise<AgentToolResult> {
     }
 }
 
-async function loadSystemPrompt(promptId?: string | null): Promise<string> {
+async function loadPromptTemplate(promptId?: string | null): Promise<string> {
     const registry = await loadPromptRegistry()
     const entries = await resolveAllPromptEntries(registry)
     const selectedId = promptId ?? (await getSelectedPromptId()) ?? registry.lastSelectedId
@@ -68,8 +87,12 @@ async function loadSystemPrompt(promptId?: string | null): Promise<string> {
         throw new Error('No system prompt is configured. Add a prompt in LLM settings.')
     }
 
-    const raw = await readPromptEntry(entry)
-    return expandPromptTokens(raw)
+    return readPromptEntry(entry)
+}
+
+async function loadSystemPrompt(promptId?: string | null): Promise<string> {
+    const template = await loadPromptTemplate(promptId)
+    return expandPromptTokens(template)
 }
 
 export async function runAgent(options: {
@@ -87,32 +110,47 @@ export async function runAgent(options: {
         throw new Error('LLM is not configured. Enable it in LLM settings.')
     }
 
-    const systemPrompt = await loadSystemPrompt(options.promptId)
+    const promptTemplate = await loadPromptTemplate(options.promptId)
+    const staticSystemPrompt = await expandStaticPromptTokens(promptTemplate)
+    const maxSteps = await resolveMaxAgentSteps(options.promptId)
     const messages: ChatMessage[] = [
-        { role: 'system', content: systemPrompt },
+        { role: 'system', content: await expandDynamicPromptTokens(staticSystemPrompt) },
         { role: 'user', content: trimmedMessage },
     ]
 
     const steps: AgentStep[] = []
     let lastAssistantContent = ''
+    let lastAssistantReasoning: string | null = null
 
-    for (let step = 0; step < MAX_AGENT_STEPS; step += 1) {
-        const assistantContent = await llmChat({
+    for (let step = 0; step < maxSteps; step += 1) {
+        messages[0] = {
+            role: 'system',
+            content: await expandDynamicPromptTokens(staticSystemPrompt),
+        }
+
+        const assistantResponse = await llmChat({
             config,
             messages,
             temperature: 0.3,
         })
 
+        const reasoning = assistantResponse.reasoningContent?.trim() || null
+        const visibleContent = assistantResponse.content.trim()
+        const assistantContent = visibleContent || reasoning || ''
+        const reasoningForDisplay = visibleContent && reasoning ? reasoning : null
+
         lastAssistantContent = assistantContent
+        lastAssistantReasoning = reasoningForDisplay
+
         steps.push({
             kind: 'llm',
             summary: `Model response (step ${step + 1})`,
-            detail: assistantContent,
+            detail: formatAssistantStepDetail(assistantContent, reasoningForDisplay),
         })
 
         messages.push({ role: 'assistant', content: assistantContent })
 
-        const toolCalls = parseToolCalls(assistantContent)
+        const toolCalls = parseToolCalls(extractProtocolParseableContent(assistantContent))
         if (toolCalls.length === 0) {
             break
         }
@@ -143,15 +181,34 @@ export async function runAgent(options: {
         })
     }
 
-    const views = parseViewBlocks(lastAssistantContent)
+    const parseableContent = extractProtocolParseableContent(lastAssistantContent)
+    const views = parseViewBlocks(parseableContent)
     const resolvedViews = await resolveViews(views)
-    const narrative = extractNarrative(lastAssistantContent)
+    const narrative = extractNarrative(
+        combineAssistantResponse(lastAssistantContent, lastAssistantReasoning),
+    )
+    const observationBlocks = parseObservationBlocks(parseableContent)
+    const observationResult =
+        observationBlocks.length > 0 ? await applyObservationBlocks(observationBlocks) : null
 
     return {
         narrative,
         views: resolvedViews,
         steps,
         usedLlm: true,
+        observations: observationResult
+            ? {
+                  applied: observationResult.applied.map((entry) => ({
+                      action: entry.action,
+                      record: {
+                          id: entry.record.id,
+                          content: entry.record.content,
+                          confidence: entry.record.confidence,
+                      },
+                  })),
+                  failed: observationResult.failed,
+              }
+            : undefined,
     }
 }
 

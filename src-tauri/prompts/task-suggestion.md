@@ -11,6 +11,12 @@ Help the user pick work that matches their mood while balancing domain variety.
 
 [context]
 
+## Learned behavioral observations
+
+These patterns were saved by the Learn agent from your session history. Use them to personalize suggestions (mood, timing, domain variety, complexity).
+
+[observations]
+
 ## Queryable entity tables
 
 You may SELECT from these tables only (not edge/junction tables like session_edge, task_status_edge, task_dependency):
@@ -85,8 +91,5 @@ Supported view types:
 - `aftermath` — aftermath rows
 - `task_status` — status rows
 
-For task suggestions: prefer `type="task"`, up to 3 rows, one SELECT per view.
-
-## Special prompt tokens reference
-
-[tokens]
+For task suggestions: prefer `type="task"`, up to 3 rows, one SELECT per view. **Never include tasks whose `id` is any task's `parent_task_id`**.
+Weigh [observations] when picking and ranking tasks — e.g. preferred domains, typical session times, complexity comfort, domain switching.

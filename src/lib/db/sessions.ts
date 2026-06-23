@@ -3,8 +3,9 @@ import { v4 as uuid } from 'uuid'
 
 import { getDb } from '$lib/db'
 import { session, sessionEdge, task } from '$lib/db/schema'
+import { getCurrentProjectId } from '$lib/projectState.svelte'
 import { formatSqlTimestamp, parseSqlTimestamp } from '$lib/calendar/dates'
-import { loadDomainOptions, type TaskRef } from '$lib/db/dataView'
+import { loadDomainOptions, taskHasChildren, type TaskRef } from '$lib/db/dataView'
 import {
     normalizeSessionStatus,
     SessionStatusCode,
@@ -27,6 +28,7 @@ export type SessionRecord = {
     ended_at: string
     status: SessionStatusCode
     aftermath_id: string | null
+    project_id: string | null
     tasks: TaskRef[]
     task_title: string | null
     task_color: number | null
@@ -39,6 +41,7 @@ export type SessionInput = {
     status?: SessionStatusCode
     task_ids: string[]
     aftermath_id?: string | null
+    project_id?: string | null
 }
 
 type SessionRow = {
@@ -47,6 +50,7 @@ type SessionRow = {
     ended_at: string | null
     status: number | null
     aftermath_id: string | null
+    project_id: string | null
 }
 
 type SessionTaskRow = {
@@ -130,13 +134,14 @@ function buildSessionRecord(
         ended_at: String(row.ended_at ?? ''),
         status: normalizeSessionStatus(row.status),
         aftermath_id: normalizeOptionalId(row.aftermath_id),
+        project_id: normalizeOptionalId(row.project_id),
         tasks,
         task_title: primaryTask?.title ?? null,
         task_color: primaryTask ? resolveTaskColor(primaryTask, domains) : null,
     }
 }
 
-async function loadSessionTaskRows(): Promise<{
+async function loadSessionTaskRows(projectId?: string | null): Promise<{
     sessionRows: SessionRow[]
     taskRows: SessionTaskRow[]
     domains: Awaited<ReturnType<typeof loadDomainOptions>>
@@ -146,16 +151,21 @@ async function loadSessionTaskRows(): Promise<{
         return { sessionRows: [], taskRows: [], domains: [] }
     }
 
+    const sessionQuery = db
+        .select({
+            id: session.id,
+            started_at: session.started_at,
+            ended_at: session.ended_at,
+            status: session.status,
+            aftermath_id: session.aftermath_id,
+            project_id: session.project_id,
+        })
+        .from(session)
+
     const [sessionRows, taskRows, domains] = await Promise.all([
-        db
-            .select({
-                id: session.id,
-                started_at: session.started_at,
-                ended_at: session.ended_at,
-                status: session.status,
-                aftermath_id: session.aftermath_id,
-            })
-            .from(session),
+        projectId != null
+            ? sessionQuery.where(eq(session.project_id, projectId))
+            : sessionQuery,
         db
             .select({
                 session_id: sessionEdge.session_id,
@@ -196,8 +206,8 @@ function groupTasksBySession(taskRows: SessionTaskRow[]): Map<string, TaskRef[]>
     return grouped
 }
 
-async function loadSessionRecords(): Promise<SessionRecord[]> {
-    const { sessionRows, taskRows, domains } = await loadSessionTaskRows()
+async function loadSessionRecords(projectId?: string | null): Promise<SessionRecord[]> {
+    const { sessionRows, taskRows, domains } = await loadSessionTaskRows(projectId)
     const tasksBySession = groupTasksBySession(taskRows)
 
     return sessionRows.map((row) =>
@@ -228,8 +238,8 @@ async function syncSessionTasks(sessionId: string, taskIds: string[]): Promise<v
     onSessionDataChanged()
 }
 
-export async function loadSessions(): Promise<SessionRecord[]> {
-    return loadSessionRecords()
+export async function loadSessions(projectId?: string | null): Promise<SessionRecord[]> {
+    return loadSessionRecords(projectId)
 }
 
 export type TaskSessionTimeline = {
@@ -293,8 +303,8 @@ export function createSessionInputForTask(
     }
 }
 
-export async function loadDashboardSessions(): Promise<SessionRecord[]> {
-    const sessions = await loadSessionRecords()
+export async function loadDashboardSessions(projectId?: string | null): Promise<SessionRecord[]> {
+    const sessions = await loadSessionRecords(projectId)
     return sessions.filter((entry) => entry.status !== SessionStatusCode.NoLongerNeeded)
 }
 
@@ -359,12 +369,15 @@ export async function createSession(input: Omit<SessionInput, 'id'>): Promise<Se
         throw new Error('At least one task is required')
     }
 
+    const currentProjectId = getCurrentProjectId()
+
     await db.insert(session).values({
         id,
         started_at: input.started_at,
         ended_at: input.ended_at,
         status: input.status ?? SessionStatusCode.Planned,
         aftermath_id: input.aftermath_id ?? null,
+        project_id: input.project_id !== undefined ? input.project_id : currentProjectId,
     })
 
     await syncSessionTasks(id, taskIds)
@@ -375,6 +388,23 @@ export async function createSession(input: Omit<SessionInput, 'id'>): Promise<Se
     }
 
     return created
+}
+
+export async function createAndStartSessionForTask(taskId: string): Promise<SessionRecord> {
+    if (await taskHasChildren(taskId)) {
+        throw new Error('This task has subtasks and cannot be started directly.')
+    }
+
+    const now = new Date()
+    const created = await createSession(createSessionInputForTask(taskId, now, now.getHours()))
+    await startSession(created.id, now)
+
+    const started = (await loadSessionRecords()).find((entry) => entry.id === created.id)
+    if (!started) {
+        throw new Error('Failed to load started session')
+    }
+
+    return started
 }
 
 export async function updateSession(input: SessionInput): Promise<void> {
@@ -399,6 +429,7 @@ export async function updateSession(input: SessionInput): Promise<void> {
             ended_at: input.ended_at,
             status: input.status ?? SessionStatusCode.Planned,
             aftermath_id: input.aftermath_id ?? null,
+            project_id: input.project_id ?? null,
         })
         .where(eq(session.id, input.id))
 
@@ -550,6 +581,7 @@ export function createDefaultSessionInput(day: Date, hour = 9): SessionInput {
         status: SessionStatusCode.Planned,
         task_ids: [],
         aftermath_id: null,
+        project_id: getCurrentProjectId(),
     }
 }
 
@@ -561,5 +593,6 @@ export function sessionToInput(session: SessionRecord): SessionInput {
         status: session.status,
         task_ids: session.tasks.map((task) => task.id),
         aftermath_id: session.aftermath_id,
+        project_id: session.project_id,
     }
 }

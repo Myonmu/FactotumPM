@@ -12,6 +12,7 @@
         type Node,
     } from '@xyflow/svelte'
     import '@xyflow/svelte/dist/style.css'
+    import '$lib/styles/xyflow-theme.css'
     import { Flag, Plus, RefreshCw, Trash2, CircleStop } from 'lucide-svelte'
 
     import StatusNode from '$lib/components/StatusNode.svelte'
@@ -210,8 +211,8 @@
                 label: status.name,
                 description: status.description,
                 color: status.color,
-                isInitial: status.is_initial === 1,
-                isTerminal: status.is_terminal === 1,
+                isInitial: status.is_initial,
+                isTerminal: status.is_terminal,
                 isConnectionSource: status.id === connectionDragSourceId,
                 isDropTarget:
                     status.id === connectionDropTargetId
@@ -823,7 +824,7 @@
                     </label>
 
                     {#if selectedStatus.isTerminal}
-                        <div class="badge badge-neutral gap-1">
+                        <div class="badge badge-ghost gap-1 text-base-content/70">
                             <CircleStop class="w-3 h-3" />
                             Terminal — tasks here appear dimmed on the board
                         </div>
@@ -872,55 +873,6 @@
 </div>
 
 <style>
-    .status-machine-flow :global(.svelte-flow) {
-        --xy-edge-stroke: oklch(var(--bc) / 0.45);
-        --xy-edge-stroke-selected: oklch(var(--p));
-        --xy-connectionline-stroke: oklch(var(--bc) / 0.45);
-        --xy-edge-label-background-color: oklch(var(--b1));
-        --xy-edge-label-color: oklch(var(--bc));
-        --xy-background-color: oklch(var(--b1));
-        --xy-background-pattern-dots-color: oklch(var(--bc) / 0.2);
-
-        --xy-attribution-background-color: color-mix(
-            in oklch,
-            oklch(var(--b2)) 88%,
-            transparent
-        );
-
-        --xy-minimap-background-color: oklch(var(--b2));
-        --xy-minimap-mask-background-color: color-mix(
-            in oklch,
-            oklch(var(--b1)) 40%,
-            transparent
-        );
-        --xy-minimap-mask-stroke-color: oklch(var(--bc) / 0.25);
-        --xy-minimap-node-background-color: oklch(var(--p));
-        --xy-minimap-node-stroke-color: transparent;
-
-        --xy-controls-button-background-color: oklch(var(--b2));
-        --xy-controls-button-background-color-hover: oklch(var(--b3));
-        --xy-controls-button-color: oklch(var(--bc));
-        --xy-controls-button-color-hover: oklch(var(--bc));
-        --xy-controls-button-border-color: oklch(var(--bc) / 0.15);
-        --xy-controls-box-shadow: 0 1px 3px oklch(var(--bc) / 0.12);
-    }
-
-    .status-machine-flow :global(.svelte-flow__controls) {
-        border: 1px solid oklch(var(--bc) / 0.12);
-        border-radius: var(--rounded-box, 0.5rem);
-        overflow: hidden;
-    }
-
-    .status-machine-flow :global(.svelte-flow__minimap) {
-        border: 1px solid oklch(var(--bc) / 0.12);
-        border-radius: var(--rounded-box, 0.5rem);
-        overflow: hidden;
-    }
-
-    .status-machine-flow :global(.svelte-flow__attribution a) {
-        color: oklch(var(--bc) / 0.45);
-    }
-
     .status-machine-flow :global(.status-transition-edge) {
         pointer-events: none !important;
     }
@@ -931,15 +883,5 @@
 
     .status-machine-flow :global(.status-transition-edge .svelte-flow__edge-interaction) {
         pointer-events: stroke !important;
-    }
-
-    .status-machine-flow :global(.svelte-flow__edge-label) {
-        color: oklch(var(--bc));
-        background: oklch(var(--b1));
-        border: 1px solid oklch(var(--bc) / 0.2);
-        border-radius: 4px;
-        padding: 2px 6px;
-        font-size: 11px;
-        line-height: 1.2;
     }
 </style>

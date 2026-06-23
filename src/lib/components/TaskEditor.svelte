@@ -1,7 +1,9 @@
 ﻿<script lang="ts">
+    import { onMount } from 'svelte';
     import MetricInput from '$lib/components/MetricInput.svelte';
     import DomainSearchableSelect from '$lib/components/DomainSearchableSelect.svelte';
-    import SearchableSelect from '$lib/components/SearchableSelect.svelte';
+    import ProjectSearchableSelect from '$lib/components/projects/ProjectSearchableSelect.svelte';
+    import TaskStatusSearchableSelect from '$lib/components/TaskStatusSearchableSelect.svelte';
     import TaskChildTree from '$lib/components/TaskChildTree.svelte';
     import TaskRefCard from '$lib/components/TaskRefCard.svelte';
     import TaskSearchableSelect from '$lib/components/TaskSearchableSelect.svelte';
@@ -23,6 +25,7 @@
         type TaskRef,
         type DomainOption,
     } from '$lib/db/dataView';
+    import { loadProjectOptions, type ProjectRef } from '$lib/db/projects';
     import { getStatusTransitionActions } from '$lib/db/taskStatusMachine';
     import { mixDisplayColorInt, resolveTaskColor, colorIntToHex, colorHexToInt } from '$lib/grid/colorUtils';
     import { Anvil, ArrowRight, Dices, Puzzle, Trash2, Unlink } from "lucide-svelte";
@@ -43,11 +46,12 @@
         parent_task_id: string | null
         is_trophy: number | null
         task_status_id: string | null
+        project_id: string | null
     }
 
     type DomainItem = DomainOption
     type TaskItem = TaskRef
-    type StatusItem = { id: string; title: string; is_initial?: boolean; color?: number | null }
+    type StatusItem = { id: string; title: string; is_initial?: boolean; is_terminal?: boolean; color?: number | null }
     type StatusEdge = {
         id: string
         from_status_id: string
@@ -86,7 +90,7 @@
 
     type ChildViewMode = 'direct' | 'recursive'
     type DependencyViewMode = 'explicit' | 'implicit'
-    type EditorTab = 'basics' | 'detail' | 'children' | 'dependencies' | 'sessions'
+    type EditorTab = 'basics' | 'detail' | 'children' | 'dependencies' | 'sessions' | 'project'
 
     let activeTab = $state<EditorTab>('basics')
 
@@ -104,6 +108,13 @@
     let dependencyLinkBusy = $state(false)
     let addChildSelection = $state('')
     let addDependencySelection = $state('')
+    let projects = $state<ProjectRef[]>([])
+
+    onMount(() => {
+        void loadProjectOptions().then((entries) => {
+            projects = entries
+        })
+    })
 
     const tasksById = $derived(new Map(tasks.map((item) => [item.id, item])))
 
@@ -364,11 +375,12 @@
 </script>
 
 <div
-        class="card bg-base-100 shadow-xl border border-base-200"
+        class="card flex min-h-0 flex-1 flex-col bg-base-100 shadow-xl border border-base-200"
         style:border-color={taskBorderColor}>
 
-    <div class="card-body space-y-4">
+    <div class="card-body flex min-h-0 flex-1 flex-col gap-4">
 
+        <div class="flex shrink-0 flex-col gap-4">
         <div class="flex items-center gap-4">
             <input
                     class="input input-bordered text-xl font-semibold flex-1"
@@ -395,8 +407,11 @@
                     onclick={() => (activeTab = 'dependencies')}
             />
             <TableTab label="Sessions" active={activeTab === 'sessions'} onclick={() => (activeTab = 'sessions')} />
+            <TableTab label="Project" active={activeTab === 'project'} onclick={() => (activeTab = 'project')} />
+        </div>
         </div>
 
+        <div class="flex min-h-0 flex-1 flex-col overflow-y-auto">
         {#if activeTab === 'basics'}
         <div class="grid gap-4 @md:grid-cols-3">
             <div class="flex items-end gap-2">
@@ -440,7 +455,7 @@
             </div>
         </div>
 
-        <div class="grid gap-4 @md:grid-cols-2">
+        <div class="grid gap-4 @md:grid-cols-2 @2xl:grid-cols-4">
             <DomainSearchableSelect
                     label="Domain"
                     {domains}
@@ -457,51 +472,57 @@
                     placeholder="Select parent task..."
                     group="task-inspector"
             />
-        </div>
 
-        <label class="form-control w-full">
-            <span class="label-text font-medium">Task color</span>
-            <div class="flex flex-wrap items-center gap-2">
-                <input
-                        type="color"
-                        class="h-10 w-14 cursor-pointer rounded border border-base-300 bg-base-100 p-1"
-                        value={taskColorPickerValue}
-                        oninput={(event) => {
-                            const hex = (event.currentTarget as HTMLInputElement).value
-                            localTask = {
-                                ...localTask,
-                                color: colorHexToInt(hex),
-                            }
-                        }}
-                />
-                <span class="text-sm text-base-content/70">
-                    {#if usesDomainColor}
-                        Using domain color
-                    {:else}
-                        Custom color
-                    {/if}
-                </span>
-                {#if !usesDomainColor}
-                    <button
-                            type="button"
-                            class="btn btn-ghost btn-xs"
-                            onclick={() => {
-                                localTask = { ...localTask, color: null }
+            <div class="relative space-y-1">
+                <label class="text-sm font-medium">Color</label>
+                <div
+                        class="btn select select-bordered flex h-auto min-h-10 w-full items-center gap-2 px-2 py-1 text-left"
+                        style:border-color={taskBorderColor}
+                        style:background-color={taskColor != null
+                            ? `color-mix(in srgb, ${taskBorderColor} 12%, oklch(var(--b1)))`
+                            : ''}
+                >
+                    <input
+                            type="color"
+                            class="h-8 w-10 shrink-0 cursor-pointer rounded border border-base-300 bg-base-100 p-0.5"
+                            value={taskColorPickerValue}
+                            oninput={(event) => {
+                                const hex = (event.currentTarget as HTMLInputElement).value
+                                localTask = {
+                                    ...localTask,
+                                    color: colorHexToInt(hex),
+                                }
                             }}
-                    >
-                        Use domain color
-                    </button>
-                {/if}
+                    />
+                    <span class="min-w-0 flex-1 truncate text-sm text-base-content/70">
+                        {#if usesDomainColor}
+                            Domain color
+                        {:else}
+                            Custom
+                        {/if}
+                    </span>
+                    {#if !usesDomainColor}
+                        <button
+                                type="button"
+                                class="btn btn-ghost btn-xs shrink-0"
+                                onclick={() => {
+                                    localTask = { ...localTask, color: null }
+                                }}
+                        >
+                            Reset
+                        </button>
+                    {/if}
+                </div>
             </div>
-        </label>
 
-        <SearchableSelect
-                label="Status"
-                items={statuses}
-                bind:value={localTask.task_status_id as string}
-                placeholder="Select status..."
-                group="task-inspector"
-        />
+            <TaskStatusSearchableSelect
+                    label="Status"
+                    statuses={statuses}
+                    bind:value={localTask.task_status_id as string}
+                    placeholder="Select status..."
+                    group="task-inspector"
+            />
+        </div>
 
         {#if statusActions.length > 0}
             <div class="space-y-2">
@@ -521,22 +542,8 @@
                 </div>
             </div>
         {/if}
-
-        {#if onDelete}
-            <div class="card-actions justify-start">
-                <button
-                        type="button"
-                        class="btn btn-error btn-outline gap-2"
-                        disabled={deleting || effectiveHasChildren}
-                        title={deleteDisabledReason ?? undefined}
-                        onclick={() => (showDeleteConfirm = true)}
-                >
-                    <Trash2 class="h-4 w-4" />
-                    Delete Task
-                </button>
-            </div>
-        {/if}
         {:else if activeTab === 'detail'}
+            <div class="flex min-h-0 flex-1 flex-col">
             {#key localTask.id}
                 <TaskEditorDetailTab
                         value={localTask.detail}
@@ -545,6 +552,7 @@
                         }}
                 />
             {/key}
+            </div>
         {:else if activeTab === 'children'}
         <div class="space-y-2">
             <div class="flex flex-wrap items-center justify-between gap-2">
@@ -766,8 +774,35 @@
                 />
             {/if}
         </div>
-        {:else}
+        {:else if activeTab === 'sessions'}
             <TaskEditorSessionsTab taskId={task.id} {tasks} {domains} />
+        {:else if activeTab === 'project'}
+            <ProjectSearchableSelect
+                    label="Project"
+                    {projects}
+                    value={localTask.project_id ?? ''}
+                    placeholder="Global (all projects)"
+                    group="task-inspector"
+                    onSelect={(id) => {
+                        localTask = { ...localTask, project_id: id || null }
+                    }}
+            />
+        {/if}
+        </div>
+
+        {#if onDelete}
+            <div class="mt-auto shrink-0 border-t border-base-300 pt-4">
+                <button
+                        type="button"
+                        class="btn btn-error btn-outline gap-2"
+                        disabled={deleting || effectiveHasChildren}
+                        title={deleteDisabledReason ?? undefined}
+                        onclick={() => (showDeleteConfirm = true)}
+                >
+                    <Trash2 class="h-4 w-4" />
+                    Delete Task
+                </button>
+            </div>
         {/if}
 
     </div>

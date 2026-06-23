@@ -27,7 +27,7 @@
     }
 </script>
 
-<div class="space-y-3">
+<div class="flex h-full min-h-0 flex-col gap-3">
     <div class="flex flex-wrap items-center justify-between gap-2">
         <span class="text-sm font-medium">Detail</span>
         <div class="join">
@@ -54,7 +54,7 @@
 
     {#if mode === 'edit'}
         <textarea
-                class="textarea textarea-bordered min-h-64 w-full font-mono text-sm leading-relaxed"
+                class="textarea textarea-bordered min-h-48 w-full flex-1 resize-none font-mono text-sm leading-relaxed"
                 value={value ?? ''}
                 placeholder="Write markdown detail notes..."
                 oninput={handleInput}

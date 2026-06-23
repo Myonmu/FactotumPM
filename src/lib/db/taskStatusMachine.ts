@@ -5,6 +5,7 @@ import { v4 as uuid } from 'uuid'
 import { getDb } from '$lib/db'
 import { taskStatus, taskStatusEdge } from '$lib/db/schema'
 import { getStatusEdgeColorHex } from '$lib/statusMachine/edgeColor'
+import { loadKanbanGraphPositions, upsertKanbanGraphPosition } from '$lib/db/projects'
 
 export type TaskStatusRecord = {
     id: string
@@ -14,8 +15,8 @@ export type TaskStatusRecord = {
     pos_y: number
     kanban_pos_x: number
     kanban_pos_y: number
-    is_initial: number | null
-    is_terminal: number | null
+    is_initial: boolean
+    is_terminal: boolean
     color: number | null
 }
 
@@ -30,13 +31,14 @@ export type TaskStatusEdgeRecord = {
 export function isTerminalStatus(
     status: Pick<TaskStatusRecord, 'is_terminal'> | null | undefined,
 ): boolean {
-    return status?.is_terminal === 1
+    return status?.is_terminal === true
 }
 
 export type TaskStatusOption = {
     id: string
     title: string
     is_initial?: boolean
+    is_terminal?: boolean
     color?: number | null
 }
 
@@ -85,7 +87,7 @@ export function getStatusTransitionActions(
         })
 }
 
-export async function loadTaskStatusMachine(): Promise<{
+export async function loadTaskStatusMachine(projectId?: string | null): Promise<{
     statuses: TaskStatusRecord[]
     edges: TaskStatusEdgeRecord[]
 }> {
@@ -94,24 +96,28 @@ export async function loadTaskStatusMachine(): Promise<{
         return { statuses: [], edges: [] }
     }
 
-    const [statuses, edges] = await Promise.all([
+    const [statuses, edges, graphPositions] = await Promise.all([
         db.select().from(taskStatus),
         db.select().from(taskStatusEdge),
+        loadKanbanGraphPositions(projectId ?? null),
     ])
 
     return {
-        statuses: statuses.map((row) => ({
-            id: row.id,
-            name: row.name,
-            description: row.description,
-            pos_x: row.pos_x ?? 0,
-            pos_y: row.pos_y ?? 0,
-            kanban_pos_x: row.kanban_pos_x ?? row.pos_x ?? 0,
-            kanban_pos_y: row.kanban_pos_y ?? row.pos_y ?? 0,
-            is_initial: row.is_initial,
-            is_terminal: row.is_terminal,
-            color: row.color,
-        })),
+        statuses: statuses.map((row) => {
+            const graphPos = graphPositions.get(row.id)
+            return {
+                id: row.id,
+                name: row.name,
+                description: row.description,
+                pos_x: row.pos_x ?? 0,
+                pos_y: row.pos_y ?? 0,
+                kanban_pos_x: graphPos?.pos_x ?? row.kanban_pos_x ?? row.pos_x ?? 0,
+                kanban_pos_y: graphPos?.pos_y ?? row.kanban_pos_y ?? row.pos_y ?? 0,
+                is_initial: row.is_initial,
+                is_terminal: row.is_terminal,
+                color: row.color,
+            }
+        }),
         edges: edges.map((row) => ({
             id: row.id,
             from_status_id: row.from_status_id,
@@ -131,6 +137,7 @@ export async function loadTaskStatusOptions(): Promise<TaskStatusOption[]> {
             id: taskStatus.id,
             name: taskStatus.name,
             is_initial: taskStatus.is_initial,
+            is_terminal: taskStatus.is_terminal,
             color: taskStatus.color,
         })
         .from(taskStatus)
@@ -139,7 +146,8 @@ export async function loadTaskStatusOptions(): Promise<TaskStatusOption[]> {
     return rows.map((row) => ({
         id: row.id,
         title: row.name,
-        is_initial: row.is_initial === 1,
+        is_initial: row.is_initial ?? false,
+        is_terminal: row.is_terminal ?? false,
         color: row.color,
     }))
 }
@@ -151,7 +159,7 @@ export async function getInitialTaskStatusId(): Promise<string | null> {
     const rows = await db
         .select({ id: taskStatus.id })
         .from(taskStatus)
-        .where(eq(taskStatus.is_initial, 1))
+        .where(eq(taskStatus.is_initial, true))
         .limit(1)
 
     return rows[0]?.id ?? null
@@ -177,8 +185,8 @@ export async function createTaskStatus(input: {
         pos_y: input.pos_y,
         kanban_pos_x: input.pos_x,
         kanban_pos_y: input.pos_y,
-        is_initial: 0,
-        is_terminal: 0,
+        is_initial: false,
+        is_terminal: false,
         color: null,
     }
 
@@ -224,16 +232,9 @@ export async function updateTaskStatusKanbanPosition(
     id: string,
     kanban_pos_x: number,
     kanban_pos_y: number,
+    projectId?: string | null,
 ): Promise<void> {
-    const db = await getDb()
-    if (!db) {
-        throw new Error('Database not initialized')
-    }
-
-    await db
-        .update(taskStatus)
-        .set({ kanban_pos_x, kanban_pos_y })
-        .where(eq(taskStatus.id, id))
+    await upsertKanbanGraphPosition(projectId ?? null, id, kanban_pos_x, kanban_pos_y)
 }
 
 export async function setInitialTaskStatus(id: string): Promise<void> {

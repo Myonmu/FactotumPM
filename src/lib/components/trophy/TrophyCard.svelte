@@ -1,6 +1,7 @@
 <script lang="ts">
     import { Anvil, Clock, Dices, Puzzle } from 'lucide-svelte'
 
+    import DomainIconInline from '$lib/components/DomainIconInline.svelte'
     import TrophyIcon from '$lib/components/trophy/TrophyIcon.svelte'
     import type { DomainOption } from '$lib/db/dataView'
     import { mixDisplayColorInt, resolveTaskColor } from '$lib/grid/colorUtils'
@@ -12,10 +13,12 @@
     let {
         view,
         domains = [],
+        preview = false,
         onClick,
     }: {
         view: TrophyView
         domains?: DomainOption[]
+        preview?: boolean
         onClick?: () => void
     } = $props()
 
@@ -49,9 +52,12 @@
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
-        role="button"
-        tabindex="0"
-        class="trophy-card card card-compact w-full cursor-pointer border bg-base-100 text-left shadow-sm transition-all hover:shadow-md"
+        role={preview ? 'presentation' : 'button'}
+        tabindex={preview ? undefined : 0}
+        class="trophy-card card card-compact w-full border bg-base-100 text-left shadow-sm transition-all"
+        class:cursor-pointer={!preview}
+        class:hover:shadow-md={!preview}
+        class:pointer-events-none={preview}
         class:border-base-300={!view.achieved}
         class:achieved={view.achieved}
         style:border-color={view.achieved ? view.type.colors[0] : taskBorderColor || undefined}
@@ -59,8 +65,8 @@
         style:background-color={taskColor != null
             ? `color-mix(in srgb, ${taskBorderColor} 10%, oklch(var(--b1)))`
             : ''}
-        onclick={() => onClick?.()}
-        onkeydown={(event) => {
+        onclick={preview ? undefined : () => onClick?.()}
+        onkeydown={preview ? undefined : (event) => {
             if (event.key === 'Enter' || event.key === ' ') {
                 event.preventDefault()
                 onClick?.()
@@ -76,10 +82,9 @@
                 <TrophyIcon colors={view.type.colors} size={30} radiant={view.achieved} />
             </div>
             <div class="min-w-0 flex-1">
-                <div class="flex items-center gap-2">
-                    <span class="flex-1 truncate text-sm font-semibold leading-snug">
-                        {task.title}
-                    </span>
+                <div class="flex min-w-0 items-center gap-2">
+                    <DomainIconInline domainId={task.domain_id} {domains} />
+                    <span class="flex-1 text-sm font-semibold leading-snug">{task.title}</span>
                     {#if view.achieved}
                         <span class="badge badge-xs border-0 font-semibold"
                               style:background-color={view.type.colors[0]}
@@ -88,7 +93,7 @@
                         </span>
                     {/if}
                 </div>
-                <p class="mt-0.5 truncate text-xs text-base-content/60">{view.type.shortLabel}</p>
+                <p class="mt-0.5 text-xs text-base-content/60" class:truncate={!preview}>{view.type.shortLabel}</p>
             </div>
         </div>
 

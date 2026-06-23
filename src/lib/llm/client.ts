@@ -1,6 +1,6 @@
 import { invoke } from '@tauri-apps/api/core'
 
-import type { ChatMessage, LlmChatRequest, LlmConfig, SqlRow } from './types'
+import type { ChatMessage, LlmChatRequest, LlmChatResponse, LlmConfig, SqlRow } from './types'
 
 function toRustConfig(config: LlmConfig) {
     return {
@@ -12,8 +12,8 @@ function toRustConfig(config: LlmConfig) {
     }
 }
 
-export async function llmChat(request: LlmChatRequest): Promise<string> {
-    return invoke<string>('llm_chat', {
+export async function llmChat(request: LlmChatRequest): Promise<LlmChatResponse> {
+    const raw = await invoke<{ content: string; reasoning_content?: string | null }>('llm_chat', {
         request: {
             config: toRustConfig(request.config),
             messages: request.messages.map((message) => ({
@@ -24,6 +24,11 @@ export async function llmChat(request: LlmChatRequest): Promise<string> {
             json_mode: request.jsonMode ?? null,
         },
     })
+
+    return {
+        content: raw.content ?? '',
+        reasoningContent: raw.reasoning_content ?? null,
+    }
 }
 
 export async function llmTestConnection(config: LlmConfig): Promise<string> {
@@ -60,12 +65,14 @@ export async function chatJson<T>(
     messages: ChatMessage[],
     temperature = 0.3,
 ): Promise<T> {
-    const raw = await llmChat({
-        config,
-        messages,
-        temperature,
-        jsonMode: true,
-    })
+    const raw = (
+        await llmChat({
+            config,
+            messages,
+            temperature,
+            jsonMode: true,
+        })
+    ).content
 
     const trimmed = raw.trim()
     const jsonStart = trimmed.indexOf('{')

@@ -11,6 +11,7 @@
         type Node,
     } from '@xyflow/svelte'
     import '@xyflow/svelte/dist/style.css'
+    import '$lib/styles/xyflow-theme.css'
     import { LayoutGrid, RefreshCw } from 'lucide-svelte'
 
     import ConnectionDragPreview from '$lib/components/ConnectionDragPreview.svelte'
@@ -38,6 +39,7 @@
         type TaskRecord,
         type TaskRef,
     } from '$lib/db/dataView'
+    import { readSqlBoolean } from '$lib/db/coerce'
     import {
         loadTaskStatusMachine,
         loadTaskStatusOptions,
@@ -65,6 +67,12 @@
         endTaskInspectorSession,
         navigateToRelatedTask,
     } from '$lib/taskInspectorNav.svelte'
+
+    let {
+        projectId = null,
+    }: {
+        projectId?: string | null
+    } = $props()
 
     const nodeTypes = { routeTask: RouteTaskNode, routePackage: RoutePackageNode }
 
@@ -115,10 +123,10 @@
     async function refreshTaskContext() {
         const [loadedDomains, loadedTasks, loadedStatuses, machine, loadedDependencies] =
             await Promise.all([
-                loadDomainOptions(),
-                loadTaskOptions(),
+                loadDomainOptions(projectId),
+                loadTaskOptions(projectId),
                 loadTaskStatusOptions(),
-                loadTaskStatusMachine(),
+                loadTaskStatusMachine(projectId),
                 loadTaskDependencyEdges(),
             ])
 
@@ -336,7 +344,7 @@
                 ...task,
                 route_pos_x: update.x,
                 route_pos_y: update.y,
-                route_pos_manual: 1,
+                route_pos_manual: true,
             }
         })
 
@@ -353,7 +361,7 @@
                         ...node.data.task,
                         route_pos_x: update.x,
                         route_pos_y: update.y,
-                        route_pos_manual: 1,
+                        route_pos_manual: true,
                     },
                 },
             }
@@ -459,23 +467,29 @@
         }
 
         nodes = laidOut.map((node) => {
-            const previous = previousById.get(node.id)
             const task = node.data?.task
-            if (!previous || !isTaskRoutePositionManual(task)) return node
+            if (!isTaskRoutePositionManual(task)) return node
+
+            const previous = previousById.get(node.id)
+            const position =
+                previous?.position
+                ?? (task.route_pos_x != null && task.route_pos_y != null
+                    ? { x: task.route_pos_x, y: task.route_pos_y }
+                    : node.position)
 
             return {
                 ...node,
-                position: { ...previous.position },
-                width: previous.width ?? node.width,
-                height: previous.height ?? node.height,
-                style: previous.style ?? node.style,
+                position: { ...position },
+                width: previous?.width ?? node.width,
+                height: previous?.height ?? node.height,
+                style: previous?.style ?? node.style,
                 data: {
                     ...node.data,
                     task: {
                         ...task,
-                        route_pos_x: previous.position.x,
-                        route_pos_y: previous.position.y,
-                        route_pos_manual: 1,
+                        route_pos_x: position.x,
+                        route_pos_y: position.y,
+                        route_pos_manual: true,
                     },
                 },
             }
@@ -494,7 +508,7 @@
                 ...task,
                 route_pos_x: null,
                 route_pos_y: null,
-                route_pos_manual: null,
+                route_pos_manual: false,
             }))
             rebuildGraph({ preserveManualPositions: false })
             fitViewTrigger += 1
@@ -511,7 +525,7 @@
         error = null
 
         try {
-            const taskResult = await fetchTableRows('task')
+            const taskResult = await fetchTableRows('task', projectId)
             tasks = taskResult.rows.map(recordToTask)
             await refreshTaskContext()
             rebuildGraph()
@@ -603,8 +617,8 @@
         const existing = tasks.find((task) => task.id === updatedTask.id)
         const liveNode = nodes.find((node) => node.id === updatedTask.id)
         const preserveRouteLayout =
-            existing?.route_pos_manual === 1
-            || liveNode?.data.task.route_pos_manual === 1
+            readSqlBoolean(existing?.route_pos_manual)
+            || readSqlBoolean(liveNode?.data.task.route_pos_manual)
 
         const merged: TaskRecord = existing
             ? {
@@ -617,7 +631,7 @@
                       ? liveNode.position.y
                       : existing.route_pos_y,
                   route_pos_manual: preserveRouteLayout
-                      ? 1
+                      ? true
                       : existing.route_pos_manual,
               }
             : updatedTask
@@ -657,12 +671,22 @@
         untrack(() => rebuildGraph())
     })
 
+    let initialized = false
+
     onMount(() => {
         resetRouteGraphNav()
-        void loadGraph()
+        void loadGraph().then(() => { initialized = true })
 
         return () => {
             resetRouteGraphNav()
+        }
+    })
+
+    $effect(() => {
+        const _pid = projectId
+        if (initialized) {
+            resetRouteGraphNav()
+            void loadGraph()
         }
     })
 </script>
@@ -822,62 +846,6 @@
         width: 100%;
         height: 100%;
         min-height: 24rem;
-        --xy-edge-stroke: oklch(var(--bc) / 0.45);
-        --xy-edge-stroke-selected: oklch(var(--p));
-        --xy-connectionline-stroke: oklch(var(--bc) / 0.45);
-        --xy-edge-label-background-color: oklch(var(--b1));
-        --xy-edge-label-color: oklch(var(--bc));
-        --xy-background-color: oklch(var(--b1));
-        --xy-background-pattern-dots-color: oklch(var(--bc) / 0.2);
-
-        --xy-attribution-background-color: color-mix(
-            in oklch,
-            oklch(var(--b2)) 88%,
-            transparent
-        );
-
-        --xy-minimap-background-color: oklch(var(--b2));
-        --xy-minimap-mask-background-color: color-mix(
-            in oklch,
-            oklch(var(--b1)) 40%,
-            transparent
-        );
-        --xy-minimap-mask-stroke-color: oklch(var(--bc) / 0.25);
-        --xy-minimap-node-background-color: oklch(var(--p));
-        --xy-minimap-node-stroke-color: transparent;
-
-        --xy-controls-button-background-color: oklch(var(--b2));
-        --xy-controls-button-background-color-hover: oklch(var(--b3));
-        --xy-controls-button-color: oklch(var(--bc));
-        --xy-controls-button-color-hover: oklch(var(--bc));
-        --xy-controls-button-border-color: oklch(var(--bc) / 0.15);
-        --xy-controls-box-shadow: 0 1px 3px oklch(var(--bc) / 0.12);
-    }
-
-    .route-graph-flow :global(.svelte-flow__controls) {
-        border: 1px solid oklch(var(--bc) / 0.12);
-        border-radius: var(--rounded-box, 0.5rem);
-        overflow: hidden;
-    }
-
-    .route-graph-flow :global(.svelte-flow__minimap) {
-        border: 1px solid oklch(var(--bc) / 0.12);
-        border-radius: var(--rounded-box, 0.5rem);
-        overflow: hidden;
-    }
-
-    .route-graph-flow :global(.svelte-flow__attribution a) {
-        color: oklch(var(--bc) / 0.45);
-    }
-
-    .route-graph-flow :global(.svelte-flow__edge-label) {
-        color: oklch(var(--bc));
-        background: oklch(var(--b1));
-        border: 1px solid oklch(var(--bc) / 0.2);
-        border-radius: 4px;
-        padding: 2px 6px;
-        font-size: 11px;
-        line-height: 1.2;
     }
 
     .route-graph-flow :global(.svelte-flow__pane) {
@@ -895,10 +863,6 @@
     .route-graph-flow :global(.svelte-flow__node.route-package-group),
     .route-graph-flow :global(.svelte-flow__node.parent:has(.route-package-node)) {
         overflow: visible;
-    }
-
-    .route-graph-flow :global(.svelte-flow__edge-path) {
-        stroke-linecap: round;
     }
 
     .route-graph-flow :global(.route-dependency-edge) {

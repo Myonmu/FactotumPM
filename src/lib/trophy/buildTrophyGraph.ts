@@ -25,7 +25,7 @@ function buildTrophyOwnership(tasks: TaskRecord[]): Map<string, string> {
         if (!task) return null
 
         let owner: string | null
-        if (Number(task.is_trophy) === 1) {
+        if (task.is_trophy) {
             owner = task.id
         } else if (task.parent_task_id) {
             owner = resolveOwner(task.parent_task_id, seen)
@@ -53,7 +53,7 @@ function nearestAncestorTrophy(task: TaskRecord, byId: Map<string, TaskRecord>):
         seen.add(currentId)
         const current = byId.get(currentId)
         if (!current) break
-        if (Number(current.is_trophy) === 1) return current.id
+        if (current.is_trophy) return current.id
         currentId = current.parent_task_id
     }
     return null
@@ -94,7 +94,7 @@ export function buildTrophyDependencyEdges(
     // Containment: a parent trophy is only obtained once its child trophies are,
     // so the parent depends on the child (ancestor -> child).
     for (const task of tasks) {
-        if (Number(task.is_trophy) !== 1) continue
+        if (!task.is_trophy) continue
         const ancestor = nearestAncestorTrophy(task, byId)
         if (ancestor) addEdge(ancestor, task.id)
     }

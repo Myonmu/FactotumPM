@@ -80,7 +80,11 @@ pub fn stored_file_exists(path: &Path) -> bool {
     path.is_file()
 }
 
-pub fn copy_bundled_prompts(bundled_dir: &Path, prompts_dir: &Path) -> Result<Vec<String>, String> {
+pub fn copy_bundled_prompts(
+    bundled_dir: &Path,
+    prompts_dir: &Path,
+    overwrite: bool,
+) -> Result<Vec<String>, String> {
     if !bundled_dir.exists() {
         return Ok(vec![]);
     }
@@ -107,7 +111,7 @@ pub fn copy_bundled_prompts(bundled_dir: &Path, prompts_dir: &Path) -> Result<Ve
 
         let file_name = entry.file_name();
         let destination = prompts_dir.join(&file_name);
-        if !destination.exists() {
+        if !destination.exists() || overwrite {
             fs::copy(&source, &destination).map_err(|err| {
                 format!(
                     "Failed to copy prompt {}: {}",

@@ -6,6 +6,7 @@
     import Fuse from 'fuse.js'
     import { tick } from 'svelte'
 
+    import DomainIconInline from '$lib/components/DomainIconInline.svelte'
     import DomainRefChip from '$lib/components/DomainRefChip.svelte'
     import type { DomainOption } from '$lib/db/dataView'
     import { mixDisplayColorInt, resolveDomainColor } from '$lib/grid/colorUtils'
@@ -209,7 +210,10 @@
             onclick={toggleDropdown}
     >
         {#if selectedDomain}
-            <span class="truncate">{selectedDomain.title}</span>
+            <span class="flex min-w-0 items-center gap-2 truncate">
+                <DomainIconInline domainId={selectedDomain.id} {domains} />
+                <span class="truncate">{selectedDomain.title}</span>
+            </span>
         {:else}
             <span class="text-base-content/50">{placeholder || 'None'}</span>
         {/if}

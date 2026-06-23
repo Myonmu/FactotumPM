@@ -2,6 +2,7 @@
     import { Anvil, Clock, Dices, Puzzle, Trophy } from 'lucide-svelte'
     import { onMount } from 'svelte'
 
+    import DomainIconInline from '$lib/components/DomainIconInline.svelte'
     import type { TaskRecord } from '$lib/db/dataView'
     import type { DomainOption } from '$lib/db/dataView'
     import { mixDisplayColorInt, resolveTaskColor } from '$lib/grid/colorUtils'
@@ -15,6 +16,7 @@
         dragging = false,
         compact = false,
         dimmed = false,
+        preview = false,
         onPointerDragStart,
         onClick,
     }: {
@@ -23,6 +25,7 @@
         dragging?: boolean
         compact?: boolean
         dimmed?: boolean
+        preview?: boolean
         onPointerDragStart?: (event: PointerEvent, taskId: string) => void
         onClick?: () => void
     } = $props()
@@ -89,21 +92,25 @@
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
-        role="button"
-        tabindex="0"
-        class="kanban-card card card-compact w-full cursor-grab border border-base-300 bg-base-100 text-left shadow-sm transition-all hover:shadow-md active:cursor-grabbing"
+        role={preview ? 'presentation' : 'button'}
+        tabindex={preview ? undefined : 0}
+        class="kanban-card card card-compact w-full border border-base-300 bg-base-100 text-left shadow-sm transition-all"
+        class:cursor-grab={!preview}
+        class:hover:shadow-md={!preview}
+        class:active:cursor-grabbing={!preview}
+        class:cursor-default={preview}
+        class:pointer-events-none={preview}
         class:opacity-50={dragging}
         class:opacity-60={dimmed && !dragging}
         class:saturate-50={dimmed && !dragging}
         class:ring-2={dragging}
         class:ring-primary={dragging}
-        class:pointer-events-none={dragging}
         style:border-color={taskBorderColor}
         style:background-color={taskColor != null ? `color-mix(in srgb, ${taskBorderColor} 12%, oklch(var(--b1)))` : ''}
         data-task-id={task.id}
-        onpointerdown={handlePointerDown}
-        onclick={handleClick}
-        onkeydown={(event) => {
+        onpointerdown={preview ? undefined : handlePointerDown}
+        onclick={preview ? undefined : handleClick}
+        onkeydown={preview ? undefined : (event) => {
             if (event.key === 'Enter' || event.key === ' ') {
                 event.preventDefault()
                 onClick?.()
@@ -112,6 +119,7 @@
 >
     <div class="card-body gap-2 p-3" class:gap-1={compact} class:p-2={compact}>
         <div class="flex items-start gap-2">
+            <DomainIconInline domainId={task.domain_id} {domains} />
             <span class="flex-1 text-sm font-medium leading-snug">{task.title}</span>
             {#if task.is_trophy}
                 <Trophy class="h-4 w-4 shrink-0 opacity-100" color="oklch(var(--p))" />
@@ -119,7 +127,12 @@
         </div>
 
         {#if task.description}
-            <p class="text-xs text-base-content/60" class:line-clamp-2={!compact} class:line-clamp-1={compact}>
+            <p
+                    class="text-xs text-base-content/60"
+                    class:line-clamp-2={!compact && !preview}
+                    class:line-clamp-1={compact && !preview}
+                    class:whitespace-pre-wrap={preview}
+            >
                 {task.description}
             </p>
         {/if}

@@ -2,6 +2,7 @@
     import { Anvil, Clock, Dices, Puzzle, Trophy } from 'lucide-svelte'
     import { onMount } from 'svelte'
 
+    import DomainIconInline from '$lib/components/DomainIconInline.svelte'
     import type { TaskRecord } from '$lib/db/dataView'
     import type { DomainOption } from '$lib/db/dataView'
     import { mixDisplayColorInt, resolveTaskColor } from '$lib/grid/colorUtils'
@@ -64,6 +65,7 @@
 >
     <div class="card-body gap-1 p-2">
         <div class="flex items-start gap-2">
+            <DomainIconInline domainId={task.domain_id} {domains} />
             <span class="flex-1 text-sm font-medium leading-snug line-clamp-2">{task.title}</span>
             {#if task.is_trophy}
                 <Trophy class="h-4 w-4 shrink-0 opacity-100" color="oklch(var(--p))" />

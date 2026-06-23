@@ -25,7 +25,7 @@
     }
 </script>
 
-<div class="flex h-full flex-col gap-4 p-4">
+<div class="flex min-h-0 flex-1 flex-col gap-4">
     <p class="text-sm text-base-content/70">
         <span class="font-medium">{fromTaskTitle}</span>
         depends on

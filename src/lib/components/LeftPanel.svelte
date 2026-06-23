@@ -3,18 +3,21 @@
 
     let {folded} = $props();
 
-    import {Candy, SquareKanban, Database, CalendarDays, Route, Trophy, GitBranch} from "lucide-svelte";
+    import {Candy, SquareKanban, Database, CalendarDays, Route, Trophy, GitBranch, FolderKanban, Layers, BookOpen} from "lucide-svelte";
     import {onMount} from "svelte";
 
 
     const tabs = [
         {id: "dashboard", label: "Dashboard", href: "/dashboard", icon: Candy},
+        {id: "projects", label: "Projects", href: "/projects", icon: FolderKanban},
         {id: "kanban", label: "Kanban", href: "/kanban", icon: SquareKanban},
         {id: "calendar", label: "Calendar", href: "/calendar", icon: CalendarDays},
         {id: "route", label: "Route", href: "/route", icon: Route},
         {id: "trophy", label: "Trophy", href: "/trophy", icon: Trophy},
+        {id: "domains", label: "Domains", href: "/domains", icon: Layers},
         {id: "statuses", label: "Statuses", href: "/statuses", icon: GitBranch},
         {id: "dataview", label: "Data View", href: "/dataview", icon: Database},
+        {id: "documentation", label: "Documentation", href: "/documentation", icon: BookOpen},
     ];
 
     let widthClass = $derived(

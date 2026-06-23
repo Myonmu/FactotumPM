@@ -82,6 +82,7 @@ pub fn run() {
             llm::sql::execute_readonly_sql,
             commands::get_prompts_dir,
             commands::ensure_default_prompts,
+            commands::reload_bundled_prompts,
             commands::resolve_stored_path,
             commands::read_text_file,
             commands::write_text_file,

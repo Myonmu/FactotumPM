@@ -1,7 +1,6 @@
 <script lang="ts">
     import { Handle, Position, type Node, type NodeProps } from '@xyflow/svelte'
-    import { Package } from 'lucide-svelte'
-
+    import DomainIconInline from '$lib/components/DomainIconInline.svelte'
     import type { RouteNodeData } from '$lib/route/buildRouteGraph'
     import { mixDisplayColorInt, resolveTaskColor } from '$lib/grid/colorUtils'
     import {
@@ -82,7 +81,7 @@
                     onpointerdown={handlePointerDown}
                     oncontextmenu={handleContextMenu}
             >
-                <Package class="h-3.5 w-3.5 shrink-0 opacity-70" />
+                <DomainIconInline domainId={data.task.domain_id} domains={data.domains} size={14} />
                 <span class="truncate text-xs font-semibold leading-none">{data.task.title}</span>
                 {#if (data.childCount ?? 0) > 0}
                     <span class="badge badge-ghost badge-xs shrink-0">{data.childCount}</span>

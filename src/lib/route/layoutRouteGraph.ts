@@ -2,6 +2,7 @@ import dagre from '@dagrejs/dagre'
 import type { Edge, Node } from '@xyflow/svelte'
 
 import type { TaskRecord } from '$lib/db/dataView'
+import { readSqlBoolean } from '$lib/db/coerce'
 
 import { estimateRouteTaskNodeSize } from './routeTaskNodeSize'
 import {
@@ -59,7 +60,7 @@ function getTaskFromNode(node: Node): TaskRecord | null {
 }
 
 export function isTaskRoutePositionManual(task: TaskRecord | null | undefined): boolean {
-    return task?.route_pos_manual === 1
+    return readSqlBoolean(task?.route_pos_manual)
 }
 
 function isManualNode(node: Node): boolean {

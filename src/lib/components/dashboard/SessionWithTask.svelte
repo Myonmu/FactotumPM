@@ -47,7 +47,7 @@
         {#if embedSingleTask}
             <SessionRefCard {session} {domains} {now} class="w-full" />
         {:else}
-            <SessionBlock {session} {compact} {now} interactive={false} />
+            <SessionBlock {session} {domains} {compact} {now} interactive={false} />
         {/if}
 
         {#if showTasks && session.tasks.length > 1}

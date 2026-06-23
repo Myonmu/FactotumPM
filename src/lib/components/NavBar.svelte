@@ -2,7 +2,8 @@
     import {onMount} from "svelte";
     import {getPrefString, savePrefString} from "$lib/prefStore";
     import {PanelLeftOpen, PanelLeftClose} from "lucide-svelte";
-    import {checkAuthSuccess, isAuthSuccess, logoutDb} from "$lib/auth.svelte";
+    import {isAuthSuccess, logoutDb} from "$lib/auth.svelte";
+    import ProjectSelector from "$lib/components/projects/ProjectSelector.svelte";
 
     let {onToggleSidebar, sideBarFolded} = $props();
 
@@ -54,7 +55,6 @@
             currentTheme = saved;
         }
         applyTheme(currentTheme);
-        await checkAuthSuccess();
     });
 
     async function changeTheme(theme: string) {
@@ -95,6 +95,7 @@
             <button class="btn btn-sm btn-ghost" onclick={handleLogout}>
                 Logout
             </button>
+            <ProjectSelector />
         {/if}
         <div class="dropdown dropdown-end">
             <label tabindex="-1" class="btn btn-sm" for="dd">

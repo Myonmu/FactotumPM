@@ -214,7 +214,7 @@
 
                     <div class="flex items-center gap-1.5">
 
-                        {#if status.is_initial === 1}
+                        {#if status.is_initial}
 
                             <span class="tooltip tooltip-right" data-tip="Initial status">
 
@@ -228,7 +228,7 @@
 
                             <span class="tooltip tooltip-right" data-tip="Terminal status">
 
-                                <CircleStop class="h-3.5 w-3.5 shrink-0 text-neutral" />
+                                <CircleStop class="h-3.5 w-3.5 shrink-0 text-base-content/50" />
 
                             </span>
 

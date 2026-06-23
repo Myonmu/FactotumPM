@@ -14,11 +14,19 @@ export {default as taskStatusEdge} from './task_status_edge'
 
 export {default as taskDependency} from './task_dependency'
 
+export {default as observation} from './observation'
+
+export {default as project} from './project'
+
+export {default as kanbanGraphPosition} from './kanban_graph_position'
+
 
 
 /** User-facing tables shown in Data View, in display order. */
 
 export const APP_TABLE_ORDER = [
+
+    'project',
 
     'task',
 
@@ -35,6 +43,8 @@ export const APP_TABLE_ORDER = [
     'session_edge',
 
     'aftermath',
+
+    'observation',
 
 ] as const
 

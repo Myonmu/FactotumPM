@@ -1,8 +1,11 @@
 <script lang="ts">
+    import { onMount } from 'svelte'
     import TaskSearchableSelect from '$lib/components/TaskSearchableSelect.svelte'
     import DateTimeField from '$lib/components/DateTimeField.svelte'
+    import ProjectSearchableSelect from '$lib/components/projects/ProjectSearchableSelect.svelte'
     import { formatSqlTimestamp, parseSqlTimestamp } from '$lib/calendar/dates'
     import type { DomainOption, TaskRef } from '$lib/db/dataView'
+    import { loadProjectOptions, type ProjectRef } from '$lib/db/projects'
     import { getSessionDisplayTitle, type SessionInput } from '$lib/db/sessions'
     import { Plus, Trash2, X } from 'lucide-svelte'
 
@@ -36,6 +39,13 @@
     let loadedSessionKey = $state<string | null>(null)
     let lastPersistedSnapshot = $state('')
     let taskIds = $state<string[]>(session.task_ids.length > 0 ? [...session.task_ids] : [''])
+    let projects = $state<ProjectRef[]>([])
+
+    onMount(() => {
+        void loadProjectOptions().then((entries) => {
+            projects = entries
+        })
+    })
 
     let startedAt = $state<Date | null>(parseSqlTimestamp(session.started_at))
     let endedAt = $state<Date | null>(parseSqlTimestamp(session.ended_at))
@@ -83,6 +93,7 @@
             task_ids: resolvedTaskIds,
             started_at: toSqlTimestamp(startedAt),
             ended_at: toSqlTimestamp(endedAt),
+            project_id: localSession.project_id ?? null,
         }
     }
 
@@ -188,13 +199,22 @@
         class:card={!embedded}
         class:shadow-xl={!embedded}
         class:border-base-200={!embedded}
+        class:flex={!embedded}
+        class:h-full={!embedded}
+        class:min-h-0={!embedded}
+        class:flex-col={!embedded}
         class:rounded-lg={embedded}
         class:border-base-300={embedded}
         class:p-4={embedded}
 >
-    <div class="flex flex-col gap-4" class:card-body={!embedded}>
+    <div
+            class="flex flex-col gap-4"
+            class:card-body={!embedded}
+            class:min-h-0={!embedded}
+            class:flex-1={!embedded}
+    >
         {#if !embedded}
-            <div>
+            <div class="shrink-0">
                 <h2 class="text-lg font-semibold">
                     {localSession.id ? 'Edit session' : 'New session'}
                 </h2>
@@ -210,6 +230,107 @@
                     {/if}
                 </p>
             </div>
+
+            <div class="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
+                {#if lockedTaskId == null}
+                    <div class="flex flex-col gap-2">
+                        <span class="text-sm font-medium">Tasks</span>
+                        {#each taskIds as taskId, index (index)}
+                            <div class="flex items-end gap-2">
+                                <div class="min-w-0 flex-1">
+                                    <TaskSearchableSelect
+                                            label={index === 0 ? 'Task' : `Task ${index + 1}`}
+                                            {tasks}
+                                            {domains}
+                                            bind:value={taskIds[index]}
+                                            placeholder="Select a task"
+                                            group="session-inspector-{index}"
+                                    />
+                                </div>
+                                <button
+                                        type="button"
+                                        class="btn btn-ghost btn-square btn-sm shrink-0"
+                                        title="Remove task"
+                                        aria-label="Remove task"
+                                        disabled={taskIds.length <= 1 && !taskIds[0]}
+                                        onclick={() => removeTaskRow(index)}
+                                >
+                                    <X class="h-4 w-4" />
+                                </button>
+                            </div>
+                        {/each}
+
+                        <button
+                                type="button"
+                                class="btn btn-ghost btn-sm gap-2 self-start"
+                                onclick={addTaskRow}
+                        >
+                            <Plus class="h-4 w-4" />
+                            Add task
+                        </button>
+                    </div>
+                {/if}
+
+                <div class="grid gap-3 sm:grid-cols-2">
+                    <DateTimeField label="Start" bind:value={startedAt} />
+                    <DateTimeField label="End" bind:value={endedAt} />
+                </div>
+
+                <ProjectSearchableSelect
+                        label="Project"
+                        {projects}
+                        value={localSession.project_id ?? ''}
+                        placeholder="Global (all projects)"
+                        group="session-inspector"
+                        onSelect={(id) => {
+                            localSession = { ...localSession, project_id: id || null }
+                        }}
+                />
+            </div>
+
+            <div class="mt-auto flex shrink-0 flex-wrap items-center justify-between gap-2 border-t border-base-300 pt-4">
+                {#if isNewSession}
+                    <span></span>
+                    <div class="flex items-center gap-2">
+                        {#if onCancel}
+                            <button
+                                    type="button"
+                                    class="btn btn-ghost btn-sm"
+                                    onclick={onCancel}
+                                    disabled={saving || deleting}
+                            >
+                                Cancel
+                            </button>
+                        {/if}
+                        <button
+                                type="button"
+                                class="btn btn-primary btn-sm"
+                                onclick={handleCreate}
+                                disabled={saving || deleting || !canPersist}
+                        >
+                            {saving ? 'Creating…' : 'Create session'}
+                        </button>
+                    </div>
+                {:else}
+                    {#if canDelete}
+                        <button
+                                type="button"
+                                class="btn btn-error btn-outline btn-sm gap-2"
+                                onclick={() => (showDeleteConfirm = true)}
+                                disabled={saving || deleting}
+                        >
+                            <Trash2 class="h-4 w-4" />
+                            Delete session
+                        </button>
+                    {:else}
+                        <span></span>
+                    {/if}
+
+                    {#if saving}
+                        <span class="text-sm text-base-content/60">Saving…</span>
+                    {/if}
+                {/if}
+            </div>
         {:else}
             <p class="text-sm text-base-content/60">
                 {#if isNewSession}
@@ -222,95 +343,106 @@
                     Changes save automatically.
                 {/if}
             </p>
-        {/if}
 
-        {#if lockedTaskId == null}
-            <div class="flex flex-col gap-2">
-                <span class="text-sm font-medium">Tasks</span>
-                {#each taskIds as taskId, index (index)}
-                    <div class="flex items-end gap-2">
-                        <div class="min-w-0 flex-1">
-                            <TaskSearchableSelect
-                                    label={index === 0 ? 'Task' : `Task ${index + 1}`}
-                                    {tasks}
-                                    {domains}
-                                    bind:value={taskIds[index]}
-                                    placeholder="Select a task"
-                                    group="session-inspector-{index}"
-                            />
+            {#if lockedTaskId == null}
+                <div class="flex flex-col gap-2">
+                    <span class="text-sm font-medium">Tasks</span>
+                    {#each taskIds as taskId, index (index)}
+                        <div class="flex items-end gap-2">
+                            <div class="min-w-0 flex-1">
+                                <TaskSearchableSelect
+                                        label={index === 0 ? 'Task' : `Task ${index + 1}`}
+                                        {tasks}
+                                        {domains}
+                                        bind:value={taskIds[index]}
+                                        placeholder="Select a task"
+                                        group="session-inspector-{index}"
+                                />
+                            </div>
+                            <button
+                                    type="button"
+                                    class="btn btn-ghost btn-square btn-sm shrink-0"
+                                    title="Remove task"
+                                    aria-label="Remove task"
+                                    disabled={taskIds.length <= 1 && !taskIds[0]}
+                                    onclick={() => removeTaskRow(index)}
+                            >
+                                <X class="h-4 w-4" />
+                            </button>
                         </div>
-                        <button
-                                type="button"
-                                class="btn btn-ghost btn-square btn-sm shrink-0"
-                                title="Remove task"
-                                aria-label="Remove task"
-                                disabled={taskIds.length <= 1 && !taskIds[0]}
-                                onclick={() => removeTaskRow(index)}
-                        >
-                            <X class="h-4 w-4" />
-                        </button>
-                    </div>
-                {/each}
+                    {/each}
 
-                <button
-                        type="button"
-                        class="btn btn-ghost btn-sm gap-2 self-start"
-                        onclick={addTaskRow}
-                >
-                    <Plus class="h-4 w-4" />
-                    Add task
-                </button>
-            </div>
-        {/if}
-
-        <div class="grid gap-3 sm:grid-cols-2">
-            <DateTimeField label="Start" bind:value={startedAt} />
-            <DateTimeField label="End" bind:value={endedAt} />
-        </div>
-
-        <div class="flex flex-wrap items-center justify-between gap-2">
-            {#if isNewSession}
-                <span></span>
-                <div class="flex items-center gap-2">
-                    {#if onCancel}
-                        <button
-                                type="button"
-                                class="btn btn-ghost btn-sm"
-                                onclick={onCancel}
-                                disabled={saving || deleting}
-                        >
-                            Cancel
-                        </button>
-                    {/if}
                     <button
                             type="button"
-                            class="btn btn-primary btn-sm"
-                            onclick={handleCreate}
-                            disabled={saving || deleting || !canPersist}
+                            class="btn btn-ghost btn-sm gap-2 self-start"
+                            onclick={addTaskRow}
                     >
-                        {saving ? 'Creating…' : 'Create session'}
+                        <Plus class="h-4 w-4" />
+                        Add task
                     </button>
                 </div>
-            {:else}
-                {#if canDelete}
-                    <button
-                            type="button"
-                            class="btn btn-error btn-outline btn-sm gap-2"
-                            onclick={() => (showDeleteConfirm = true)}
-                            disabled={saving || deleting}
-                    >
-                        <Trash2 class="h-4 w-4" />
-                        Delete session
-                    </button>
-                {:else}
-                    <span></span>
-                {/if}
-
-                {#if saving}
-                    <span class="text-sm text-base-content/60">Saving…</span>
-                {/if}
             {/if}
-        </div>
+
+            <div class="grid gap-3 sm:grid-cols-2">
+                <DateTimeField label="Start" bind:value={startedAt} />
+                <DateTimeField label="End" bind:value={endedAt} />
+            </div>
+
+            <ProjectSearchableSelect
+                    label="Project"
+                    {projects}
+                    value={localSession.project_id ?? ''}
+                    placeholder="Global (all projects)"
+                    group="session-inspector"
+                    onSelect={(id) => {
+                        localSession = { ...localSession, project_id: id || null }
+                    }}
+            />
+
+            <div class="flex flex-wrap items-center justify-between gap-2">
+                {#if isNewSession}
+                    <span></span>
+                    <div class="flex items-center gap-2">
+                        {#if onCancel}
+                            <button
+                                    type="button"
+                                    class="btn btn-ghost btn-sm"
+                                    onclick={onCancel}
+                                    disabled={saving || deleting}
+                            >
+                                Cancel
+                            </button>
+                        {/if}
+                        <button
+                                type="button"
+                                class="btn btn-primary btn-sm"
+                                onclick={handleCreate}
+                                disabled={saving || deleting || !canPersist}
+                        >
+                            {saving ? 'Creating…' : 'Create session'}
+                        </button>
+                    </div>
+                {:else}
+                    {#if canDelete}
+                        <button
+                                type="button"
+                                class="btn btn-error btn-outline btn-sm gap-2"
+                                onclick={() => (showDeleteConfirm = true)}
+                                disabled={saving || deleting}
+                        >
+                            <Trash2 class="h-4 w-4" />
+                            Delete session
+                        </button>
+                    {:else}
+                        <span></span>
+                    {/if}
+
+                    {#if saving}
+                        <span class="text-sm text-base-content/60">Saving…</span>
+                    {/if}
+                {/if}
+            </div>
+        {/if}
     </div>
 </div>
 

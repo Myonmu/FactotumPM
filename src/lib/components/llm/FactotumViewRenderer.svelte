@@ -1,8 +1,8 @@
 <script lang="ts">
+    import AgentTaskRow from '$lib/components/llm/AgentTaskRow.svelte'
     import AftermathRefCard from '$lib/components/AftermathRefCard.svelte'
     import DomainRefChip from '$lib/components/DomainRefChip.svelte'
     import SessionRefCard from '$lib/components/SessionRefCard.svelte'
-    import TaskRefCard from '$lib/components/TaskRefCard.svelte'
     import TaskStatusRefCard from '$lib/components/TaskStatusRefCard.svelte'
     import { loadDomainOptions, type DomainOption } from '$lib/db/dataView'
     import type { AftermathRecord } from '$lib/db/aftermath'
@@ -66,7 +66,7 @@
     {:else}
         <div class="flex flex-col gap-2">
             {#each tasks as task (task.id)}
-                <TaskRefCard {task} {domains} class="w-full" />
+                <AgentTaskRow {task} {domains} />
             {/each}
         </div>
     {/if}

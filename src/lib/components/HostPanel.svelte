@@ -259,10 +259,12 @@
                 </div>
             </div>
 
-            <div class="flex-1 overflow-auto p-4 @container">
+            <div class="flex min-h-0 flex-1 flex-col overflow-hidden p-4 @container">
                 {#if component}
                     {@const InspectorContent = component}
-                    <InspectorContent {...componentProps} />
+                    <div class="inspector-content-host flex min-h-0 flex-1 flex-col overflow-hidden">
+                        <InspectorContent {...componentProps} />
+                    </div>
                 {/if}
             </div>
         </div>
@@ -314,10 +316,12 @@
             </div>
 
             <!-- Content -->
-            <div class="flex-1 overflow-auto p-4 @container">
+            <div class="flex min-h-0 flex-1 flex-col overflow-hidden p-4 @container">
                 {#if component}
                     {@const InspectorContent = component}
-                    <InspectorContent {...componentProps} />
+                    <div class="inspector-content-host flex min-h-0 flex-1 flex-col overflow-hidden">
+                        <InspectorContent {...componentProps} />
+                    </div>
                 {/if}
             </div>
 
@@ -343,3 +347,13 @@
         </div>
     {/if}
 {/if}
+
+<style>
+    :global(.inspector-content-host > *) {
+        display: flex;
+        flex-direction: column;
+        flex: 1 1 0%;
+        min-height: 0;
+        height: 100%;
+    }
+</style>

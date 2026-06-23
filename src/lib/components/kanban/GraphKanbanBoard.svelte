@@ -11,6 +11,7 @@
         type Node,
     } from '@xyflow/svelte'
     import '@xyflow/svelte/dist/style.css'
+    import '$lib/styles/xyflow-theme.css'
     import { RefreshCw } from 'lucide-svelte'
 
     import KanbanCard from '$lib/components/kanban/KanbanCard.svelte'
@@ -69,6 +70,7 @@
         resolveColumnSort,
         type KanbanGlobalFilters,
     } from '$lib/kanban/kanbanGlobalFilters'
+    import { getCurrentProjectId } from '$lib/projectState.svelte'
 
     let {
         filterTaskIds = null,
@@ -84,6 +86,8 @@
             newStatusId: string,
         ) => void | Promise<void>
     } = $props()
+
+    const currentProjectId = $derived(getCurrentProjectId())
 
     const nodeTypes = { kanbanColumn: KanbanColumnNode }
     const edgeTypes = { statusTransition: StatusTransitionEdge }
@@ -156,11 +160,12 @@
     })
 
     async function refreshTaskContext() {
+        const projectId = currentProjectId
         const [loadedDomains, loadedTasks, loadedStatuses, machine, loadedDependencies] = await Promise.all([
-            loadDomainOptions(),
-            loadTaskOptions(),
+            loadDomainOptions(projectId),
+            loadTaskOptions(projectId),
             loadTaskStatusOptions(),
-            loadTaskStatusMachine(),
+            loadTaskStatusMachine(projectId),
             loadTaskDependencyEdges(),
         ])
         domains = loadedDomains
@@ -174,8 +179,8 @@
         return {
             label: status.name,
             description: status.description,
-            isInitial: status.is_initial === 1,
-            isTerminal: status.is_terminal === 1,
+            isInitial: status.is_initial,
+            isTerminal: status.is_terminal,
             statusColor: colorIntToHex(status.color),
             tasks: statusTasks,
             totalTaskCount: taskCountsByStatus.get(status.id) ?? 0,
@@ -270,8 +275,12 @@
         error = null
 
         try {
+            const projectId = currentProjectId
             const [{ statuses: loadedStatuses, edges: loadedEdges }, taskResult] =
-                await Promise.all([loadTaskStatusMachine(), fetchTableRows('task')])
+                await Promise.all([
+                    loadTaskStatusMachine(projectId),
+                    fetchTableRows('task', projectId),
+                ])
 
             statuses = loadedStatuses
             statusEdges = loadedEdges
@@ -470,6 +479,7 @@
                 dragged.id,
                 dragged.position.x,
                 dragged.position.y,
+                currentProjectId,
             )
             statuses = statuses.map((status) =>
                 status.id === dragged.id
@@ -512,13 +522,21 @@
         }
     }
 
+    let initialized = false
+
     onMount(() => {
         void (async () => {
             if (globalFilters === undefined) {
                 storedGlobalFilters = await loadKanbanGlobalFilters()
             }
             await loadBoard()
+            initialized = true
         })()
+    })
+
+    $effect(() => {
+        const _pid = currentProjectId
+        if (initialized) void loadBoard()
     })
 
     $effect(() => {
@@ -609,66 +627,11 @@
 {/if}
 
 <style>
-    .graph-kanban-flow :global(.svelte-flow) {
-        --xy-edge-stroke: oklch(var(--bc) / 0.45);
-        --xy-edge-stroke-selected: oklch(var(--p));
-        --xy-connectionline-stroke: oklch(var(--bc) / 0.45);
-        --xy-edge-label-background-color: oklch(var(--b1));
-        --xy-edge-label-color: oklch(var(--bc));
-        --xy-background-color: oklch(var(--b1));
-        --xy-background-pattern-dots-color: oklch(var(--bc) / 0.2);
-
-        --xy-attribution-background-color: color-mix(
-            in oklch,
-            oklch(var(--b2)) 88%,
-            transparent
-        );
-
-        --xy-minimap-background-color: oklch(var(--b2));
-        --xy-minimap-mask-background-color: color-mix(
-            in oklch,
-            oklch(var(--b1)) 40%,
-            transparent
-        );
-        --xy-minimap-mask-stroke-color: oklch(var(--bc) / 0.25);
-        --xy-minimap-node-background-color: oklch(var(--p));
-        --xy-minimap-node-stroke-color: transparent;
-
-        --xy-controls-button-background-color: oklch(var(--b2));
-        --xy-controls-button-background-color-hover: oklch(var(--b3));
-        --xy-controls-button-color: oklch(var(--bc));
-        --xy-controls-button-color-hover: oklch(var(--bc));
-        --xy-controls-button-border-color: oklch(var(--bc) / 0.15);
-        --xy-controls-box-shadow: 0 1px 3px oklch(var(--bc) / 0.12);
-    }
-
-    .graph-kanban-flow :global(.svelte-flow__controls) {
-        border: 1px solid oklch(var(--bc) / 0.12);
-        border-radius: var(--rounded-box, 0.5rem);
-        overflow: hidden;
-    }
-
-    .graph-kanban-flow :global(.svelte-flow__minimap) {
-        border: 1px solid oklch(var(--bc) / 0.12);
-        border-radius: var(--rounded-box, 0.5rem);
-        overflow: hidden;
-    }
-
     .graph-kanban-flow :global(.status-transition-edge) {
         pointer-events: none !important;
     }
 
     .graph-kanban-flow :global(.status-transition-edge .svelte-flow__edge-path) {
         pointer-events: none !important;
-    }
-
-    .graph-kanban-flow :global(.svelte-flow__edge-label) {
-        color: oklch(var(--bc));
-        background: oklch(var(--b1));
-        border: 1px solid oklch(var(--bc) / 0.2);
-        border-radius: 4px;
-        padding: 2px 6px;
-        font-size: 11px;
-        line-height: 1.2;
     }
 </style>

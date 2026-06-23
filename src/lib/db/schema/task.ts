@@ -3,6 +3,7 @@ import {type AnySQLiteColumn, integer, real, sqliteTable, text} from 'drizzle-or
 import {v4 as uuid} from 'uuid'
 import domain from "./domain";
 import taskStatus from "./task_status";
+import project from "./project";
 
 /** Design Philosophy
  * Unlike most PM tools, our tool is focused on personal use for folks that have diverse capabilities (the opposite to teams)
@@ -50,11 +51,12 @@ const task = sqliteTable('task', {
     color: integer('color'),
     // use a searchable dropdown
     parent_task_id: text('parent_task_id').references((): AnySQLiteColumn => task.id), // is this part of a bigger task
-    is_trophy: integer("is_trophy"), // use a trophy icon toggle (dim = not a trophy, light = is trophy)
+    is_trophy: integer('is_trophy', { mode: 'boolean' }).notNull().default(false),
     task_status_id: text('task_status_id').references(() => taskStatus.id),
+    project_id: text('project_id').references(() => project.id),
     route_pos_x: real('route_pos_x'),
     route_pos_y: real('route_pos_y'),
-    route_pos_manual: integer('route_pos_manual'),
+    route_pos_manual: integer('route_pos_manual', { mode: 'boolean' }).notNull().default(false),
     created_at: text('created_at').default(sql`CURRENT_TIMESTAMP`),
     updated_at: text('updated_at')
         .default(sql`CURRENT_TIMESTAMP`)
@@ -77,6 +79,7 @@ const task_columns= [
     {id: "parent_task_id", header: "Parent Task"},
     {id: "is_trophy", header: "Trophy?"},
     {id: "task_status_id", header: "Status"},
+    {id: "project_id", header: "Project"},
     {id: "route_pos_x", header: "Route Pos X", hidden: true},
     {id: "route_pos_y", header: "Route Pos Y", hidden: true},
     {id: "route_pos_manual", header: "Route Pos Manual", hidden: true},

@@ -11,6 +11,7 @@
         type Node,
     } from '@xyflow/svelte'
     import '@xyflow/svelte/dist/style.css'
+    import '$lib/styles/xyflow-theme.css'
 
     import TrophyProgressionNode, {
         type TrophyNodeData,
@@ -125,19 +126,5 @@
         width: 100%;
         height: 100%;
         min-height: 24rem;
-        --xy-edge-stroke: oklch(var(--bc) / 0.45);
-        --xy-edge-stroke-selected: oklch(var(--p));
-        --xy-background-color: oklch(var(--b1));
-        --xy-background-pattern-dots-color: oklch(var(--bc) / 0.2);
-        --xy-minimap-background-color: oklch(var(--b2));
-        --xy-controls-button-background-color: oklch(var(--b2));
-        --xy-controls-button-background-color-hover: oklch(var(--b3));
-        --xy-controls-button-color: oklch(var(--bc));
-        --xy-controls-button-color-hover: oklch(var(--bc));
-        --xy-controls-button-border-color: oklch(var(--bc) / 0.15);
-    }
-
-    .trophy-graph-flow :global(.svelte-flow__edge-path) {
-        stroke-linecap: round;
     }
 </style>

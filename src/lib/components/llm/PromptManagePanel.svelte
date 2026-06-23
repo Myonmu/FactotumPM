@@ -1,6 +1,6 @@
 <script lang="ts">
     import { onMount } from 'svelte'
-    import { FolderOpen, Plus, Trash2, X } from 'lucide-svelte'
+    import { FolderOpen, Plus, RefreshCw, Trash2, X } from 'lucide-svelte'
 
     import {
         addPromptEntry,
@@ -8,6 +8,7 @@
         pickPromptFile,
         pickNewPromptSavePath,
         registerPromptPath,
+        reloadPromptRegistry,
         removePromptEntry,
         resolveAllPromptEntries,
         updatePromptEntryPath,
@@ -25,6 +26,7 @@
 
     let entries = $state<ResolvedPromptEntry[]>([])
     let loading = $state(true)
+    let reloading = $state(false)
     let error = $state<string | null>(null)
 
     async function refresh() {
@@ -43,6 +45,20 @@
     onMount(() => {
         void refresh()
     })
+
+    async function handleReload() {
+        reloading = true
+        error = null
+        try {
+            await reloadPromptRegistry()
+            await refresh()
+            onChanged?.()
+        } catch (err) {
+            error = err instanceof Error ? err.message : 'Failed to reload prompts'
+        } finally {
+            reloading = false
+        }
+    }
 
     async function handleCreate() {
         const path = await pickNewPromptSavePath()
@@ -191,6 +207,19 @@ SELECT id, title FROM task LIMIT 20
 
         <div class="modal-action">
             <button type="button" class="btn btn-ghost" onclick={() => onClose?.()}>Close</button>
+            <button
+                    type="button"
+                    class="btn btn-outline gap-2"
+                    disabled={reloading || loading}
+                    onclick={() => void handleReload()}
+            >
+                {#if reloading}
+                    <span class="loading loading-spinner loading-sm"></span>
+                {:else}
+                    <RefreshCw class="h-4 w-4" />
+                {/if}
+                Reload prompts
+            </button>
             <button type="button" class="btn btn-outline gap-2" onclick={() => void handleCreate()}>
                 <Plus class="h-4 w-4" />
                 Create prompt

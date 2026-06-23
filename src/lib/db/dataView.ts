@@ -1,14 +1,17 @@
 import { invoke } from '@tauri-apps/api/core'
-import { eq, inArray } from 'drizzle-orm'
+import { eq, inArray, isNull } from 'drizzle-orm'
 import { v4 as uuid } from 'uuid'
 
 import { getDb } from '$lib/db'
+import { readSqlBoolean } from '$lib/db/coerce'
 import { APP_TABLE_ORDER, domain, task, taskDependency } from '$lib/db/schema'
 import { getInitialTaskStatusId } from '$lib/db/taskStatusMachine'
 import { readMetricCanEstimate } from '$lib/taskMetrics'
 import type { ColumnEditorKind, ColumnMeta, ReferenceOption } from '$lib/tableRendering'
 import { isGridColumn } from '$lib/tableRendering'
 import { SESSION_STATUS_OPTIONS } from '$lib/db/sessionStatus'
+import { getCurrentProjectId } from '$lib/projectState.svelte'
+import { projectScopeCondition } from '$lib/db/projectScope'
 
 type SqlRow = {
     columns: string[]
@@ -16,12 +19,14 @@ type SqlRow = {
 }
 
 const TABLE_DEFAULTS: Partial<Record<string, Record<string, unknown>>> = {
+    project: { name: 'New project' },
     task: { title: 'New task' },
     task_dependency: {},
     task_status: { name: 'New status', pos_x: 0, pos_y: 0 },
     task_status_edge: { action: '' },
     domain: { name: 'New domain' },
     aftermath: { description: 'New aftermath' },
+    observation: { content: 'New observation', confidence: 0.5 },
     session_edge: {},
 }
 
@@ -148,6 +153,7 @@ const REFERENCE_LABEL_COLUMNS: Record<string, string> = {
     aftermath: 'description',
     session: 'id',
     task_status: 'name',
+    project: 'name',
 }
 
 const SESSION_STATUS_ENUM_OPTIONS: ReferenceOption[] = SESSION_STATUS_OPTIONS.map((option) => ({
@@ -216,7 +222,14 @@ function detectEditorKind(
     }
 
     if (
-        column.name.startsWith('is_')
+        column.name.endsWith('_can_estimate')
+        && column.dataType.toUpperCase().includes('INT')
+    ) {
+        return 'number'
+    }
+
+    if (
+        (column.name.startsWith('is_') || column.name === 'route_pos_manual')
         && column.dataType.toUpperCase().includes('INT')
     ) {
         return 'boolean'
@@ -350,7 +363,10 @@ export async function getPrimaryKeyColumn(tableName: string): Promise<string> {
     throw new Error(`No primary key found for table ${tableName}`)
 }
 
-export async function fetchTableRows(tableName: string): Promise<{
+export async function fetchTableRows(
+    tableName: string,
+    projectId?: string | null,
+): Promise<{
     columns: ColumnMeta[]
     rows: Record<string, unknown>[]
 }> {
@@ -362,12 +378,24 @@ export async function fetchTableRows(tableName: string): Promise<{
         gridColumns.length > 0 ? gridColumns : columns.filter((column) => column.isPrimaryKey)
 
     const selectList = selectColumns.map((column) => quoteIdentifier(column.name)).join(', ')
-    const sql =
-        selectList.length > 0
+
+    const projectFilterableTables = ['task', 'session']
+    const hasProjectCol = columns.some((c) => c.name === 'project_id')
+    let sql: string
+    let params: unknown[] = []
+
+    if (projectId != null && projectFilterableTables.includes(tableName) && hasProjectCol) {
+        sql = selectList.length > 0
+            ? `SELECT ${selectList} FROM ${quoteIdentifier(tableName)} WHERE project_id = ?`
+            : `SELECT ${quoteIdentifier(await getPrimaryKeyColumn(tableName))} FROM ${quoteIdentifier(tableName)} WHERE project_id = ?`
+        params = [projectId]
+    } else {
+        sql = selectList.length > 0
             ? `SELECT ${selectList} FROM ${quoteIdentifier(tableName)}`
             : `SELECT ${quoteIdentifier(await getPrimaryKeyColumn(tableName))} FROM ${quoteIdentifier(tableName)}`
+    }
 
-    const sqlRows = await executeQuery(sql)
+    const sqlRows = await executeQuery(sql, params)
 
     return {
         columns,
@@ -490,10 +518,23 @@ export async function insertTableRow(tableName: string): Promise<Record<string, 
     const columns = await getTableColumns(tableName)
     const row = buildDefaultRow(tableName, columns)
 
-    if (tableName === 'task' && row.task_status_id == null) {
-        const initialStatusId = await getInitialTaskStatusId()
-        if (initialStatusId) {
-            row.task_status_id = initialStatusId
+    if (tableName === 'task') {
+        if (row.task_status_id == null) {
+            const initialStatusId = await getInitialTaskStatusId()
+            if (initialStatusId) {
+                row.task_status_id = initialStatusId
+            }
+        }
+        const currentProjectId = getCurrentProjectId()
+        if (currentProjectId != null) {
+            row.project_id = currentProjectId
+        }
+    }
+
+    if (tableName === 'session') {
+        const currentProjectId = getCurrentProjectId()
+        if (currentProjectId != null) {
+            row.project_id = currentProjectId
         }
     }
 
@@ -557,20 +598,21 @@ export type TaskRecord = {
     /** Explicit task color override. Null means inherit from domain at display time. */
     color: number | null
     parent_task_id: string | null
-    is_trophy: number | null
+    is_trophy: boolean
     task_status_id: string | null
+    project_id: string | null
     route_pos_x: number | null
     route_pos_y: number | null
-    route_pos_manual: number | null
+    route_pos_manual: boolean
     created_at?: string | null
     updated_at?: string | null
 }
 
-export async function loadDomainOptions(): Promise<DomainOption[]> {
+export async function loadDomainOptions(projectId?: string | null): Promise<DomainOption[]> {
     const db = await getDb()
     if (!db) return []
 
-    const rows = await db
+    const baseQuery = db
         .select({
             id: domain.id,
             name: domain.name,
@@ -579,6 +621,10 @@ export async function loadDomainOptions(): Promise<DomainOption[]> {
             icon: domain.icon,
         })
         .from(domain)
+
+    // In project mode: this project or global (no project) items
+    const scope = projectScopeCondition(domain.project_id, projectId ?? null)
+    const rows = scope ? await baseQuery.where(scope) : await baseQuery
 
     return rows.map((row) => ({
         id: row.id,
@@ -595,7 +641,7 @@ export type TaskRef = {
     parent_task_id: string | null
     domain_id: string | null
     color: number | null
-    is_trophy: number | null
+    is_trophy: boolean
     uncertainty: number | null
     uncertainty_can_estimate: number | null
     complexity: number | null
@@ -607,11 +653,11 @@ export type TaskRef = {
 /** @deprecated Use TaskRef */
 export type TaskOption = TaskRef
 
-export async function loadTaskOptions(): Promise<TaskRef[]> {
+export async function loadTaskOptions(projectId?: string | null): Promise<TaskRef[]> {
     const db = await getDb()
     if (!db) return []
 
-    const rows = await db
+    const baseQuery = db
         .select({
             id: task.id,
             title: task.title,
@@ -628,13 +674,16 @@ export async function loadTaskOptions(): Promise<TaskRef[]> {
         })
         .from(task)
 
+    const scope = projectScopeCondition(task.project_id, projectId ?? null)
+    const rows = scope ? await baseQuery.where(scope) : await baseQuery
+
     return rows.map((row) => ({
         id: row.id,
         title: row.title,
         parent_task_id: row.parent_task_id ?? null,
         domain_id: row.domain_id ?? null,
         color: row.color ?? null,
-        is_trophy: row.is_trophy ?? null,
+        is_trophy: row.is_trophy ?? false,
         uncertainty: row.uncertainty ?? null,
         uncertainty_can_estimate: row.uncertainty_can_estimate ?? null,
         complexity: row.complexity ?? null,
@@ -928,6 +977,32 @@ export async function taskHasChildren(taskId: string): Promise<boolean> {
     return rows.length > 0
 }
 
+/** Task ids that have at least one child task (non-actionable for sessions). */
+export async function loadTaskIdsWithChildren(taskIds: string[]): Promise<Set<string>> {
+    const parents = await loadAllParentTaskIds()
+    if (taskIds.length === 0) return new Set()
+
+    const wanted = new Set(taskIds)
+    return new Set([...parents].filter((id) => wanted.has(id)))
+}
+
+export async function isTaskActionable(taskId: string): Promise<boolean> {
+    return !(await taskHasChildren(taskId))
+}
+
+async function loadAllParentTaskIds(): Promise<Set<string>> {
+    const db = await getDb()
+    if (!db) return new Set()
+
+    const rows = await db.select({ parent_task_id: task.parent_task_id }).from(task)
+
+    return new Set(
+        rows
+            .map((row) => row.parent_task_id)
+            .filter((id): id is string => typeof id === 'string' && id.length > 0),
+    )
+}
+
 export async function moveTaskToStatus(taskId: string, statusId: string): Promise<void> {
     const db = await getDb()
     if (!db) {
@@ -955,7 +1030,7 @@ export async function updateTaskRoutePosition(
         .set({
             route_pos_x,
             route_pos_y,
-            route_pos_manual: 1,
+            route_pos_manual: true,
         })
         .where(eq(task.id, taskId))
 }
@@ -973,7 +1048,7 @@ export async function clearTaskRoutePositions(taskIds: string[]): Promise<void> 
         .set({
             route_pos_x: null,
             route_pos_y: null,
-            route_pos_manual: null,
+            route_pos_manual: false,
         })
         .where(inArray(task.id, taskIds))
 }
@@ -1001,6 +1076,7 @@ export async function saveTaskRecord(updatedTask: TaskRecord): Promise<void> {
             parent_task_id: updatedTask.parent_task_id,
             is_trophy: updatedTask.is_trophy,
             task_status_id: updatedTask.task_status_id,
+            project_id: updatedTask.project_id,
         })
         .where(eq(task.id, updatedTask.id))
 }
@@ -1020,12 +1096,12 @@ export function recordToTask(record: Record<string, unknown>): TaskRecord {
         domain_id: record.domain_id == null ? null : String(record.domain_id),
         color: record.color == null ? null : Number(record.color),
         parent_task_id: record.parent_task_id == null ? null : String(record.parent_task_id),
-        is_trophy: record.is_trophy == null ? null : Number(record.is_trophy),
+        is_trophy: readSqlBoolean(record.is_trophy),
         task_status_id: record.task_status_id == null ? null : String(record.task_status_id),
+        project_id: record.project_id == null ? null : String(record.project_id),
         route_pos_x: record.route_pos_x == null ? null : Number(record.route_pos_x),
         route_pos_y: record.route_pos_y == null ? null : Number(record.route_pos_y),
-        route_pos_manual:
-            record.route_pos_manual == null ? null : Number(record.route_pos_manual),
+        route_pos_manual: readSqlBoolean(record.route_pos_manual),
         created_at: record.created_at == null ? null : String(record.created_at),
         updated_at: record.updated_at == null ? null : String(record.updated_at),
     }

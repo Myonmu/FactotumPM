@@ -3,9 +3,11 @@
     import '../app.css';
     import NavBar from "$lib/components/NavBar.svelte";
     import LeftPanel from "$lib/components/LeftPanel.svelte";
-    import {isAuthSuccess} from "$lib/auth.svelte";
+    import {isAuthSuccess, checkAuthSuccess} from "$lib/auth.svelte";
+    import { initProjectState, resetProjectState } from "$lib/projectState.svelte";
     import {onMount} from "svelte";
     import HostPanel from "$lib/components/HostPanel.svelte";
+    import ToastHost from '$lib/components/ToastHost.svelte'
     import { closeInspector, getInspectorState } from '$lib/inspector.svelte'
 
     let isLeftPanelFolded = $state(false);
@@ -18,8 +20,17 @@
 
     let mainDisplace = $derived(isAuthSuccess() && !isLeftPanelFolded ? "ml-16" : "ml-0");
 
-    onMount(()=>{
+    onMount(async () => {
         isLeftPanelFolded = sessionStorage.getItem("isLeftPanelFolded") == "true";
+        await checkAuthSuccess();
+    })
+
+    $effect(() => {
+        if (isAuthSuccess()) {
+            void initProjectState()
+        } else {
+            resetProjectState()
+        }
     })
 
     afterNavigate(() => {
@@ -53,4 +64,6 @@
         {/if}
 
     </div>
+
+    <ToastHost />
 </div>

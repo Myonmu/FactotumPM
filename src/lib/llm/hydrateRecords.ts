@@ -48,7 +48,7 @@ export async function hydrateTaskRefsByIds(ids: string[]): Promise<TaskRef[]> {
         parent_task_id: row.parent_task_id ?? null,
         domain_id: row.domain_id ?? null,
         color: row.color ?? null,
-        is_trophy: row.is_trophy ?? null,
+        is_trophy: row.is_trophy ?? false,
         uncertainty: row.uncertainty ?? null,
         uncertainty_can_estimate: row.uncertainty_can_estimate ?? null,
         complexity: row.complexity ?? null,
@@ -107,8 +107,8 @@ export async function hydrateTaskStatusesByIds(ids: string[]): Promise<TaskStatu
         pos_y: row.pos_y ?? 0,
         kanban_pos_x: row.kanban_pos_x ?? 0,
         kanban_pos_y: row.kanban_pos_y ?? 0,
-        is_initial: row.is_initial ?? null,
-        is_terminal: row.is_terminal ?? null,
+        is_initial: row.is_initial ?? false,
+        is_terminal: row.is_terminal ?? false,
         color: row.color ?? null,
     }))
 

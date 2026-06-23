@@ -171,30 +171,46 @@ async fn list_models_with_config(config: LlmConfig) -> Result<Vec<String>, Strin
     }
 }
 
-fn extract_assistant_content(payload: &serde_json::Value) -> Option<String> {
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LlmChatResponse {
+    pub content: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reasoning_content: Option<String>,
+}
+
+fn extract_assistant_message(payload: &serde_json::Value) -> Option<LlmChatResponse> {
     let message = payload
         .get("choices")?
         .get(0)?
         .get("message")?;
 
-    if let Some(content) = message.get("content").and_then(|value| value.as_str()) {
-        let trimmed = content.trim();
-        if !trimmed.is_empty() {
-            return Some(trimmed.to_string());
-        }
+    let content = message
+        .get("content")
+        .and_then(|value| value.as_str())
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_string)
+        .unwrap_or_default();
+
+    let reasoning_content = ["reasoning_content", "reasoning"]
+        .iter()
+        .find_map(|key| {
+            message
+                .get(*key)
+                .and_then(|value| value.as_str())
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .map(str::to_string)
+        });
+
+    if content.is_empty() && reasoning_content.is_none() {
+        return None;
     }
 
-    // Some reasoning models (e.g. Qwen in LM Studio) may put text here instead.
-    for key in ["reasoning_content", "reasoning"] {
-        if let Some(content) = message.get(key).and_then(|value| value.as_str()) {
-            let trimmed = content.trim();
-            if !trimmed.is_empty() {
-                return Some(trimmed.to_string());
-            }
-        }
-    }
-
-    None
+    Some(LlmChatResponse {
+        content,
+        reasoning_content,
+    })
 }
 
 async fn chat_openai_compatible(
@@ -203,7 +219,7 @@ async fn chat_openai_compatible(
     messages: &[ChatMessage],
     temperature: Option<f32>,
     json_mode: bool,
-) -> Result<String, String> {
+) -> Result<LlmChatResponse, String> {
     let base = normalize_base_url(&config.base_url);
     let url = format!("{base}/v1/chat/completions");
 
@@ -245,7 +261,7 @@ async fn chat_openai_compatible(
         ));
     }
 
-    extract_assistant_content(&payload)
+    extract_assistant_message(&payload)
         .ok_or_else(|| format!("Unexpected LLM response shape from {url}: {payload}"))
 }
 
@@ -255,7 +271,7 @@ async fn chat_ollama_native(
     messages: &[ChatMessage],
     temperature: Option<f32>,
     json_mode: bool,
-) -> Result<String, String> {
+) -> Result<LlmChatResponse, String> {
     let base = normalize_base_url(&config.base_url);
     let url = format!("{base}/api/chat");
 
@@ -290,15 +306,22 @@ async fn chat_ollama_native(
         return Err(format!("Ollama request failed ({status}): {payload}"));
     }
 
-    payload
+    let content = payload
         .get("message")
         .and_then(|message| message.get("content"))
         .and_then(|content| content.as_str())
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
         .map(str::to_string)
-        .ok_or_else(|| format!("Unexpected Ollama response shape: {payload}"))
+        .ok_or_else(|| format!("Unexpected Ollama response shape: {payload}"))?;
+
+    Ok(LlmChatResponse {
+        content,
+        reasoning_content: None,
+    })
 }
 
-async fn chat_with_config(request: LlmChatRequest) -> Result<String, String> {
+async fn chat_with_config(request: LlmChatRequest) -> Result<LlmChatResponse, String> {
     if request.messages.is_empty() {
         return Err("At least one chat message is required".into());
     }
@@ -331,7 +354,7 @@ async fn chat_with_config(request: LlmChatRequest) -> Result<String, String> {
 }
 
 #[tauri::command]
-pub async fn llm_chat(request: LlmChatRequest) -> Result<String, String> {
+pub async fn llm_chat(request: LlmChatRequest) -> Result<LlmChatResponse, String> {
     chat_with_config(request).await
 }
 
@@ -348,7 +371,12 @@ pub async fn llm_test_connection(config: LlmConfig) -> Result<String, String> {
     };
 
     let reply = chat_with_config(request).await?;
-    Ok(reply.trim().to_string())
+    let visible = if reply.content.is_empty() {
+        reply.reasoning_content.unwrap_or_default()
+    } else {
+        reply.content
+    };
+    Ok(visible.trim().to_string())
 }
 
 #[tauri::command]

@@ -10,7 +10,7 @@ You are Factotum, helping the user understand and explore their personal project
 
 [context]
 
-## Queryable entity tables
+## Database tables for SQL
 
 [queryable_tables]
 
@@ -22,6 +22,7 @@ Request data with:
 
 SELECT only, single statement, LIMIT required (max 50).
 Always include `id` in SELECT (or use SELECT *).
+JOIN join tables (`session_edge`, `task_dependency`, `task_status_edge`) freely for complex logic.
 
 Results arrive as:
 

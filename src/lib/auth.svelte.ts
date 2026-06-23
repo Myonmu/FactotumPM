@@ -2,6 +2,7 @@
 import { goto } from "$app/navigation";
 import { clearDbInstance } from "$lib/db/index";
 import { markDbAccessed } from "$lib/dbRegistry";
+import { initProjectState, resetProjectState } from "$lib/projectState.svelte";
 
 let authSuccess = $state(false);
 
@@ -34,6 +35,9 @@ export async function authenticateDb(
         await markDbAccessed(entryId);
     }
     await checkAuthSuccess();
+    if (authSuccess) {
+        await initProjectState();
+    }
 }
 
 export async function resetDb(): Promise<void> {
@@ -44,5 +48,6 @@ export async function logoutDb(): Promise<void> {
     await invoke("logout_db");
     authSuccess = false;
     clearDbInstance();
+    resetProjectState();
     await goto("/");
 }

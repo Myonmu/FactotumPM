@@ -25,6 +25,7 @@
     } from '$lib/dashboard/dashboardNav.svelte'
 
     import { loadDashboardSessions, type SessionRecord } from '$lib/db/sessions'
+    import { getCurrentProjectId, getCurrentProject } from '$lib/projectState.svelte'
 
 
 
@@ -41,6 +42,9 @@
     let error = $state<string | null>(null)
 
     let activeTab = $state<DashboardTab>('welcome')
+
+    const currentProjectId = $derived(getCurrentProjectId())
+    const currentProject = $derived(getCurrentProject())
 
 
 
@@ -62,7 +66,7 @@
 
     async function refreshSessions() {
 
-        sessions = await loadDashboardSessions()
+        sessions = await loadDashboardSessions(currentProjectId)
 
     }
 
@@ -94,9 +98,11 @@
 
 
 
+    let initialized = false
+
     onMount(() => {
 
-        void loadDashboard()
+        void loadDashboard().then(() => { initialized = true })
 
 
 
@@ -116,6 +122,14 @@
 
     })
 
+    $effect(() => {
+
+        const _pid = currentProjectId
+
+        if (initialized) void refreshSessions()
+
+    })
+
 </script>
 
 
@@ -132,6 +146,12 @@
 
                     {dashboardView.kind === 'aftermath' ? 'Session aftermath' : 'Dashboard'}
 
+                    {#if currentProject && dashboardView.kind !== 'aftermath'}
+
+                        <span class="text-base font-normal text-base-content/50 ml-2">— {currentProject.name}</span>
+
+                    {/if}
+
                 </h1>
 
                 <p class="mt-1 text-sm text-base-content/60">
@@ -143,6 +163,10 @@
                     {:else if activeTab === 'agent'}
 
                         Ask the Factotum agent to explore your data and suggest next steps.
+
+                    {:else if currentProjectId === null}
+
+                        Sessions across all projects for today.
 
                     {:else}
 

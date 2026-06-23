@@ -44,14 +44,25 @@
 
     let syncedViewName = $state<string | null>(null)
     let syncedAnchorMs = $state<number | null>(null)
+    let sizeRefreshFrame = 0
 
     const viewName = $derived(view === 'week' ? 'timeGridWeek' : 'timeGridDay')
 
     function refreshCalendarSize() {
-        if (!calendar) return
+        if (!calendar || !host) return
 
-        requestAnimationFrame(() => {
-            calendar?.updateSize()
+        cancelAnimationFrame(sizeRefreshFrame)
+        sizeRefreshFrame = requestAnimationFrame(() => {
+            sizeRefreshFrame = requestAnimationFrame(() => {
+                if (!calendar || !host) return
+
+                const height = host.clientHeight
+                if (height > 0) {
+                    calendar.setOption('height', height)
+                }
+
+                calendar.updateSize()
+            })
         })
     }
 
@@ -208,25 +219,29 @@
         syncedAnchorMs = startOfDay(anchorDate).getTime()
 
         refreshCalendarSize()
-        requestAnimationFrame(() => {
-            requestAnimationFrame(() => {
-                calendar?.updateSize()
-            })
+
+        const resizeObserver = new ResizeObserver(() => {
+            refreshCalendarSize()
         })
 
-        const resizeTarget = gridHost ?? host
-        const resizeObserver =
-            resizeTarget &&
-            new ResizeObserver(() => {
-                refreshCalendarSize()
-            })
-
-        if (resizeTarget && resizeObserver) {
-            resizeObserver.observe(resizeTarget)
+        if (host) {
+            resizeObserver.observe(host)
         }
 
+        if (gridHost && gridHost !== host) {
+            resizeObserver.observe(gridHost)
+        }
+
+        const handleWindowResize = () => {
+            refreshCalendarSize()
+        }
+
+        window.addEventListener('resize', handleWindowResize)
+
         return () => {
-            resizeObserver?.disconnect()
+            cancelAnimationFrame(sizeRefreshFrame)
+            resizeObserver.disconnect()
+            window.removeEventListener('resize', handleWindowResize)
             instance.destroy()
             calendar = null
             syncedViewName = null

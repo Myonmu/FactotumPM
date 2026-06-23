@@ -1,6 +1,6 @@
 <script lang="ts">
     import { onMount } from 'svelte'
-    import { FileText, Settings2, Sparkles } from 'lucide-svelte'
+    import { FileText, RefreshCw, Settings2, Sparkles } from 'lucide-svelte'
 
     import AgentResultView from '$lib/components/llm/AgentResultView.svelte'
     import LlmSettingsPanel from '$lib/components/llm/LlmSettingsPanel.svelte'
@@ -9,6 +9,7 @@
         isLlmConfigured,
         loadLlmConfig,
         loadPromptRegistry,
+        reloadPromptRegistry,
         resolveAllPromptEntries,
         getSelectedPromptId,
         setSelectedPromptId,
@@ -33,6 +34,7 @@
     let showSettings = $state(false)
     let showPrompts = $state(false)
     let promptEntries = $state<ResolvedPromptEntry[]>([])
+    let reloadingPrompts = $state(false)
 
     const userRequest = $derived(getAgentUserRequest())
     const loading = $derived(getAgentLoading())
@@ -52,6 +54,19 @@
 
         if (selectedId) {
             setAgentSelectedPromptId(selectedId)
+        }
+    }
+
+    async function handleReloadPrompts() {
+        reloadingPrompts = true
+        setAgentError(null)
+        try {
+            await reloadPromptRegistry()
+            await refreshPromptList()
+        } catch (err) {
+            setAgentError(err instanceof Error ? err.message : 'Failed to reload prompts')
+        } finally {
+            reloadingPrompts = false
         }
     }
 
@@ -107,6 +122,20 @@
         </div>
 
         <div class="flex flex-wrap gap-2">
+            <button
+                    type="button"
+                    class="btn btn-ghost btn-sm gap-2"
+                    disabled={reloadingPrompts}
+                    title="Re-copy bundled prompts from disk and refresh the list"
+                    onclick={() => void handleReloadPrompts()}
+            >
+                {#if reloadingPrompts}
+                    <span class="loading loading-spinner loading-xs"></span>
+                {:else}
+                    <RefreshCw class="h-4 w-4" />
+                {/if}
+                Reload prompts
+            </button>
             <button
                     type="button"
                     class="btn btn-ghost btn-sm gap-2"
